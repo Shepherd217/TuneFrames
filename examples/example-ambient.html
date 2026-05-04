@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Ambient</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":60,"duration":"1m"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      
+      const verb = new Tone.Reverb({ decay: 8, wet: 0.8 }).toDestination();
+      const delay = new Tone.PingPongDelay('4n', 0.3).toDestination();
+      
+      // Warm pad
+      const pad = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sine' },
+        envelope: { attack: 3, decay: 1, sustain: 0.8, release: 4 }
+      }).connect(verb);
+      pad.volume.value = -8;
+
+      // Crystal high texture
+      const crystal = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sine' },
+        envelope: { attack: 4, decay: 0.5, sustain: 1, release: 3 }
+      }).connect(delay);
+      crystal.volume.value = -18;
+
+      // D minor progression — hypnotic and spacious
+      const chords = [
+        ['D3', 'F3', 'A3'],       // Dm
+        ['C3', 'E3', 'G3'],       // C
+        ['Bb2', 'D3', 'F3'],      // Bb
+        ['A2', 'C3', 'E3'],       // Am
+      ];
+      
+      const beat = Tone.Time('1n').toSeconds();
+      
+      chords.forEach((chord, i) => {
+        pad.triggerAttackRelease(chord, '1n', i * beat);
+        // Add crystal shimmer an octave up, delayed
+        crystal.triggerAttackRelease(
+          chord.map(n => {
+            const octave = parseInt(n.match(/\d/)[0]);
+            return n.replace(/\d/, octave + 1);
+          }),
+          '2n', i * beat + 0.05
+        );
+      });
+
+      // Slow bass drone
+      const drone = new Tone.MonoSynth({
+        oscillator: { type: 'sine' },
+        envelope: { attack: 2, decay: 0, sustain: 1, release: 3 }
+      }).toDestination();
+      drone.volume.value = -20;
+      drone.triggerAttackRelease('D1', '1n', 0);
+      drone.triggerAttackRelease('D1', '1n', beat * 2);
+    }
+  </script>
+</body>
+</html>

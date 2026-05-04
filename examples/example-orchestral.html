@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Orchestral</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":72,"duration":"1m"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      
+      const verb = new Tone.Reverb({ decay: 6, wet: 0.5 }).toDestination();
+      
+      // Strings section
+      const strings = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 1.5, decay: 0.3, sustain: 0.9, release: 3 }
+      }).connect(verb);
+      strings.volume.value = -12;
+
+      // Brass
+      const brass = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.3, decay: 0.2, sustain: 0.7, release: 1.5 }
+      }).connect(verb);
+      brass.volume.value = -10;
+
+      // Timpani
+      const timpani = new Tone.MembraneSynth({
+        pitchDecay: 0.05,
+        octaves: 4,
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.001, decay: 1, sustain: 0, release: 2 }
+      }).toDestination();
+      timpani.volume.value = -8;
+
+      const beat = Tone.Time('1n').toSeconds();
+
+      // Strings: swell on every bar
+      const stringChords = [
+        ['D3', 'F3', 'A3', 'C4'],  // Dm7
+        ['C3', 'E3', 'G3', 'B3'],  // Cmaj7
+        ['Bb2', 'D3', 'F3', 'A3'], // Bbmaj7
+        ['A2', 'C3', 'E3', 'G3'],  // Am7
+      ];
+      stringChords.forEach((chord, i) => {
+        strings.triggerAttackRelease(chord, '1n', i * beat);
+      });
+
+      // Brass: enters on bar 3 with fanfare
+      const fanfares = [
+        ['D4', 'F4', 'A4'],
+        ['C4', 'E4', 'G4'],
+      ];
+      fanfares.forEach((chord, i) => {
+        brass.triggerAttackRelease(chord, '2n', (i + 2) * beat);
+      });
+
+      // Timpani: tonic hits on bars 1 and 3
+      timpani.triggerAttackRelease('D2', '1n', 0);
+      timpani.triggerAttackRelease('D2', '1n', beat * 2);
+      timpani.triggerAttackRelease('A1', '2n', beat * 3.5);
+    }
+  </script>
+</body>
+</html>

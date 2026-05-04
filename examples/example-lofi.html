@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Lofi Example</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":80,"duration":"1m"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      
+      const reverb = new Tone.Reverb({ decay: 4, wet: 0.6 }).toDestination();
+      const pad = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.5, decay: 0.3, sustain: 0.8, release: 2 }
+      }).connect(reverb);
+      
+      // Am - F - C - G chord progression
+      const chords = [
+        ['A3', 'C4', 'E4'],
+        ['F3', 'A3', 'C4'],
+        ['C3', 'E3', 'G3'],
+        ['G3', 'B3', 'D4'],
+      ];
+      
+      // Play each chord for 2 beats at 80 BPM
+      for (let i = 0; i < chords.length; i++) {
+        pad.triggerAttackRelease(chords[i], '2n', i * Tone.Time('2n').toSeconds());
+      }
+      
+      // Simple melody
+      const melody = new Tone.Synth({
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.5 }
+      }).toDestination();
+      
+      melody.triggerAttackRelease('C5', '8n', Tone.Time('2n').toSeconds() * 0.5);
+      melody.triggerAttackRelease('E5', '8n', Tone.Time('2n').toSeconds() * 1.5);
+      melody.triggerAttackRelease('G5', '8n', Tone.Time('2n').toSeconds() * 2.5);
+      melody.triggerAttackRelease('C5', '4n', Tone.Time('2n').toSeconds() * 3.5);
+    }
+  </script>
+</body>
+</html>

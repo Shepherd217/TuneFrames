@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Minimal Test</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <script>
+    // This must be a named async function for the renderer to call
+    async function main() {
+      // BPM set in #tuneframes metadata
+      await Tone.start();
+      const synth = new Tone.Synth().toDestination();
+      // Explicitly schedule at transport time 0
+      synth.triggerAttackRelease('C4', '4n', 0);
+    }
+  </script>
+</body>
+</html>

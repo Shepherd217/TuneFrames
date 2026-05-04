@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames - Techno</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":130,"duration":"2n"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      const beat = Tone.Time('4n').toSeconds();
+
+      const comp = new Tone.Compressor(-18, 5).toDestination();
+      const verb = new Tone.Reverb({ decay: 1, wet: 0.3 }).toDestination();
+
+      // Kick - 4-on-the-floor
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.05, octaves: 6,
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.1 }
+      }).connect(comp);
+
+      // Hi-hat: NoiseSynth (white noise + filter envelope)
+      const hihat = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.01 }
+      }).toDestination();
+      hihat.volume.value = -10;
+
+      // Bass: detuned saws
+      const bass = new Tone.MonoSynth({
+        oscillator: { type: 'sawtooth' },
+        filter: { Q: 3, type: 'lowpass', rolloff: -24 },
+        envelope: { attack: 0.005, decay: 0.15, sustain: 0.5, release: 0.1 },
+        filterEnvelope: { attack: 0.001, decay: 0.1, sustain: 0.3, release: 0.2, baseFrequency: 80, octaves: 4 }
+      }).connect(comp);
+
+      // Pad: parallel saw chords
+      const pad = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.2, decay: 0.4, sustain: 0.7, release: 0.8 }
+      }).connect(verb);
+      pad.volume.value = -14;
+
+      // Kick: 4-on-the-floor every beat
+      for (let i = 0; i < 8; i++) {
+        kick.triggerAttackRelease('C1', '8n', i * beat);
+      }
+
+      // Hi-hat: offbeat 16ths (16 events)
+      for (let i = 0; i < 16; i++) {
+        hihat.triggerAttackRelease('16n', (i + 0.5) * beat * 0.5);
+      }
+
+      // Bass: syncopated
+      const bassPat = ['E1', 'E1', null, 'G1', 'A1', null, 'B1', 'A1', 'G1', null, 'E1', 'E1'];
+      bassPat.forEach((note, i) => {
+        if (note) bass.triggerAttackRelease(note, '8n', i * beat * 0.5);
+      });
+
+      // Pad: slow chord stabs
+      pad.triggerAttackRelease(['E2', 'G2', 'B2'], '2n', 0);
+      pad.triggerAttackRelease(['C2', 'E2', 'G2'], '2n', beat * 4);
+      pad.triggerAttackRelease(['D2', 'F2', 'A2'], '2n', beat * 6);
+    }
+  </script>
+</body>
+</html>
