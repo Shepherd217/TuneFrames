@@ -11,7 +11,7 @@
   <a href="https://www.npmjs.com/package/tuneframes"><img src="https://img.shields.io/npm/dm/tuneframes.svg?style=flat" alt="npm downloads"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="Node.js"></a>
-  <a href="https://discord.gg"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
+  <a href="https://discord.gg/shepherd217"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 <p align="center"><b>Write music in HTML. Render to MP3 with one CLI command.</b></p>
