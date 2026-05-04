@@ -33,7 +33,7 @@ HTML + Tone.js → Chromium (Tone.Offline) → WAV → FFmpeg → MP3/WAV
 Five built-in examples cover the range: a simple synth melody, a full lo-fi hip-hop beat (kick + snare + chords + melody), driving techno, textural ambient, and a layered orchestral arrangement.
 
 ```html
-<div id="tuneframes" style="display:none">{"bpm":80,"duration":"2n"}</div>
+<div id="tuneframes" style="display:none">{"bpm":80,"duration":"10s"}</div>
 <script>
   async function main() {
     await Tone.start();

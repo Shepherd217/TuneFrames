@@ -33,7 +33,7 @@ Write a `main()` function using Tone.js:
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 </head>
 <body>
-  <div id="tuneframes" style="display:none">{"bpm":120,"duration":"2n"}</div>
+  <div id="tuneframes" style="display:none">{"bpm":120,"duration":"2s"}</div>
   <script>
     async function main() {
       await Tone.start();
@@ -50,7 +50,7 @@ Write a `main()` function using Tone.js:
 Render it:
 
 ```bash
-tuneframes render composition.html --output my-track.mp3
+npx tuneframes render composition.html --output my-track.mp3
 ```
 
 ---
@@ -76,11 +76,11 @@ Run any example with `tuneframes render <path> --output <out.mp3>`.
 ### Metadata Block
 
 ```html
-<div id="tuneframes" style="display:none">{"bpm": 120, "duration": "4n"}</div>
+<div id="tuneframes" style="display:none">{"bpm": 120, "duration": "10s"}</div>
 ```
 
 - **bpm** — beats per minute (default: 120)
-- **duration** — render length in Tone.js time notation. `4n` = quarter note, `2n` = half note, `1n` = whole note, `8n` = eighth note, `16n` = sixteenth note. Or use seconds directly (e.g., `"duration": 10`).
+- **duration** — render length. Use seconds (e.g. `"10s"`) for predictable results. Tone.js time notation (`"4n"`, `"2n"`, `"1m"`) is also accepted for scheduling individual events.
 
 ### `main()` Function
 
