@@ -1,22 +1,30 @@
 # TuneFrames — Agent-Native Music Generation
 
-**Write music compositions in HTML. Render them to MP3 with one CLI command.**
+**Write music in HTML. Render to MP3 with one CLI command.**
 
-TuneFrames brings the same portability model that Hyperframes (97K npm downloads/month) proved for video — to audio. Every AI agent, Claude Code session, and workflow tool can now compose music without a single line of native audio code.
+TuneFrames ports the same portability model that made [Hyperframes](https://github.com/Shepherd217/Hyperframes) (97K npm downloads/month) successful — to audio. Every AI agent, Claude Code session, and workflow tool can now compose music without native audio code.
 
 ```bash
 npx tuneframes init my-track
-cd my-track && npx tuneframes render composition.html
+cd my-track && tuneframes render composition.html
 # Done. my-track/output.mp3 is ready.
 ```
 
 ---
 
-## How It Works
+## Install
 
-1. **Write HTML** with Tone.js — same API every web developer already knows
-2. **Add a metadata block** so TuneFrames knows the tempo and duration
-3. **Run `tuneframes render`** — Chromium headless renders the composition offline, FFmpeg encodes to MP3/WAV
+```bash
+npm install -g tuneframes
+```
+
+Or use it directly with `npx` — no install required to try it.
+
+---
+
+## Quick Start
+
+Write a `main()` function using Tone.js:
 
 ```html
 <!DOCTYPE html>
@@ -25,7 +33,7 @@ cd my-track && npx tuneframes render composition.html
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 </head>
 <body>
-  <div id="tuneframes" style="display:none">{"bpm":120,"duration":"4n"}</div>
+  <div id="tuneframes" style="display:none">{"bpm":120,"duration":"2n"}</div>
   <script>
     async function main() {
       await Tone.start();
@@ -39,25 +47,27 @@ cd my-track && npx tuneframes render composition.html
 </html>
 ```
 
+Render it:
+
+```bash
+tuneframes render composition.html --output my-track.mp3
+```
+
 ---
 
 ## Examples
 
-| Example | Description | BPM | Duration |
-|---------|-------------|-----|----------|
-| `minimal` | Single synth melody — the simplest possible TuneFrames composition | 120 | 2s |
-| `lofi` | Chord progression, melody, kick and snare — complete lo-fi hip-hop beat | 80 | 10s |
-| `techno` | 4-on-the-floor kick, noise hihat, detuned bass, pad chords | 130 | 2s |
-| `ambient` | Lush reverb pads, crystalline arpeggios — textural ambient | 60 | 2.5s |
-| `orchestral` | Strings, brass, woodwinds in a layered orchestral arrangement | 72 | 2.5s |
+Run any example with `tuneframes render <path> --output <out.mp3>`.
 
-Run any example:
+**minimal** — C major arpeggio. Simplest possible composition. 120 BPM, 2s.
 
-```bash
-node /root/tuneframes/src/cli.js render /root/tuneframes/examples/example-lofi.html --output /tmp/lofi.mp3
-# Or after npm install -g:
-tuneframes render $(npm root -g)/tuneframes/examples/example-lofi.html --output /tmp/lofi.mp3
-```
+**lofi** — Chord progression + melody + kick/snare. Complete lo-fi hip-hop beat. 80 BPM, 10s.
+
+**ambient** — Lush reverb pads + delayed crystal arpeggios over a D minor progression. 60 BPM, 4s.
+
+**orchestral** — Strings, brass, timpani in a layered 4-bar arrangement. 72 BPM, 4s.
+
+**techno** — 4-on-the-floor kick, offbeat hi-hats, detuned bass, pad chords. 130 BPM, 2s.
 
 ---
 
@@ -65,35 +75,29 @@ tuneframes render $(npm root -g)/tuneframes/examples/example-lofi.html --output 
 
 ### Metadata Block
 
-Add a `<div id="tuneframes">` to the page body to tell TuneFrames how to render:
-
-```json
-{
-  "bpm": 120,       // Beats per minute (default: 120)
-  "duration": "4n"  // Render duration as Tone.js time (default: "4n")
-}
+```html
+<div id="tuneframes" style="display:none">{"bpm": 120, "duration": "4n"}</div>
 ```
 
-TuneFrames uses [Tone.js time notation](https://tonejs.github.io/docs/latest/modules/Core.html#Time) — `4n` (quarter note), `2n` (half note), `1n` (whole note), `8n` (eighth note), `16n` (sixteenth note), or any numeric value in seconds.
+- **bpm** — beats per minute (default: 120)
+- **duration** — render length in Tone.js time notation. `4n` = quarter note, `2n` = half note, `1n` = whole note, `8n` = eighth note, `16n` = sixteenth note. Or use seconds directly (e.g., `"duration": 10`).
 
 ### `main()` Function
 
-Define an async `main()` function in a `<script>` tag. TuneFrames waits for it to complete, then renders the offline audio buffer.
+Define an async `main()` in a `<script>` tag. TuneFrames waits for it to complete, then renders the offline buffer.
 
 ```js
 async function main() {
   await Tone.start();
-
   const synth = new Tone.Synth().toDestination();
-  // Schedule all your notes, chords, and patterns here
   synth.triggerAttackRelease('C4', '4n', 0);
-  // ...
+  // Schedule all your notes here
 }
 ```
 
 ### Instruments
 
-Tone.js provides a complete instrument library:
+Tone.js is fully available:
 
 - **Synth / MonoSynth / PolySynth** — basic tone generation
 - **MembraneSynth** — kick drums, toms, bass drums
@@ -105,8 +109,8 @@ Tone.js provides a complete instrument library:
 
 ```js
 const reverb = new Tone.Reverb({ decay: 2.5, wet: 0.3 }).toDestination();
-const comp = new Tone.Compressor(-12, 2).toDestination();
 const delay = new Tone.FeedbackDelay('8n', 0.4).toDestination();
+const comp = new Tone.Compressor(-12, 2).toDestination();
 ```
 
 ---
@@ -114,13 +118,13 @@ const delay = new Tone.FeedbackDelay('8n', 0.4).toDestination();
 ## CLI
 
 ```bash
-# Render a composition to MP3
+# Render to MP3 (default)
 tuneframes render <file.html> [--output <out.mp3>]
 
 # Render to WAV (no re-encoding)
 tuneframes render <file.html> --format wav [--output <out.wav>]
 
-# Preview in browser (dev mode with live reload)
+# Preview in browser with live reload
 tuneframes preview <file.html>
 
 # Scaffold a new project
@@ -129,29 +133,34 @@ tuneframes init my-track
 
 ---
 
-## TuneFrames vs Hyperframes
-
-TuneFrames is the audio sibling of [Hyperframes](https://github.com/cusidoc/hyperframes) — the same portability model, the same agent-first philosophy, but for music instead of video.
-
-| | Hyperframes | TuneFrames |
-|---|---|---|
-| Output | MP4 video | MP3/WAV audio |
-| Framework | Remotion (React) | Tone.js |
-| Use case | Video generation, animation | Music composition, sound design |
-| Deterministic | Yes | Yes |
-
----
-
 ## Architecture
 
 ```
 HTML + Tone.js → Chromium (headless, Tone.Offline)
-                → WAV ( PCM 44.1kHz mono )
+                → WAV (PCM 44.1kHz mono)
                 → FFmpeg
                 → MP3 192kbps
 ```
 
-**Tone.Offline** is the key: it renders audio without audio hardware or a browser audio context, producing bit-for-bit identical output every time. Same input HTML = same output MP3, guaranteed.
+**Tone.Offline** is the key. It renders without audio hardware or a browser audio context, producing bit-for-bit identical output every time. Same input HTML = same output MP3, guaranteed. This is what makes TuneFrames safe for agents — no randomness, no non-determinism.
+
+---
+
+## TuneFrames vs Hyperframes
+
+Both follow the same portability philosophy. Different domains:
+
+**Hyperframes**
+- Output: MP4 video
+- Framework: Remotion (React)
+- Use case: video generation, animation
+
+**TuneFrames**
+- Output: MP3/WAV audio
+- Framework: Tone.js
+- Use case: music composition, sound design
+
+Both are deterministic, open-source, and agent-native.
 
 ---
 

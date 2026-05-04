@@ -1,18 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>TuneFrames — Minimal Test</title>
+  <title>TuneFrames — Minimal</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 </head>
 <body>
+  <div id="tuneframes" style="display:none">{"bpm":120,"duration":"2n"}</div>
   <script>
-    // This must be a named async function for the renderer to call
     async function main() {
-      // BPM set in #tuneframes metadata
       await Tone.start();
       const synth = new Tone.Synth().toDestination();
-      // Explicitly schedule at transport time 0
+      const beat = Tone.Time('4n').toSeconds();
+      // C major arpeggio — three notes, clean and simple
       synth.triggerAttackRelease('C4', '4n', 0);
+      synth.triggerAttackRelease('E4', '4n', beat);
+      synth.triggerAttackRelease('G4', '4n', beat * 2);
     }
   </script>
 </body>
