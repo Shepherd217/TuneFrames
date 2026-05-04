@@ -1,0 +1,26 @@
+<!-- TuneFrames preset: lead-piano
+     Simple 8-bar piano melody. Paste inside <script>. -->
+<script>
+  const beat = Tone.Time('4n').toSeconds();
+
+  const piano = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.005, decay: 0.3, sustain: 0.4, release: 0.8 }
+  }).toDestination();
+  piano.volume.value = -8;
+
+  const melody = [
+    { note: 'C5', time: 0 },
+    { note: 'E5', time: 1 },
+    { note: 'G5', time: 2 },
+    { note: 'E5', time: 3 },
+    { note: 'D5', time: 4 },
+    { note: 'F5', time: 5 },
+    { note: 'A5', time: 6 },
+    { note: 'F5', time: 7 },
+  ];
+
+  melody.forEach(({ note, time }) => {
+    piano.triggerAttackRelease(note, '4n', time * beat);
+  });
+</script>

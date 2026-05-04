@@ -1,0 +1,35 @@
+<!-- TuneFrames preset: drums-lofi
+     Kick + snare + hi-hat loop. Paste inside <script> in your composition. -->
+<script>
+  const beat = Tone.Time('4n').toSeconds();
+
+  const kick = new Tone.MembraneSynth({
+    pitchDecay: 0.05, octaves: 6,
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.1 }
+  }).toDestination();
+
+  const snare = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.1 }
+  }).toDestination();
+
+  const hihat = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.01 }
+  }).toDestination();
+  hihat.volume.value = -14;
+
+  // Kick on 1, 2, 3, 4
+  for (let i = 0; i < 4; i++) {
+    kick.triggerAttackRelease('C1', '4n', i * beat);
+  }
+
+  // Snare on 2 and 4
+  [1, 3].forEach(i => snare.triggerAttackRelease('C3', '4n', i * beat));
+
+  // Hi-hat on every 8th note
+  for (let i = 0; i < 8; i++) {
+    hihat.triggerAttackRelease('16n', i * beat * 0.5);
+  }
+</script>

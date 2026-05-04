@@ -1,0 +1,22 @@
+<!-- TuneFrames preset: bass-saw
+     Detuned saw MonoSynth bass. Paste inside <script>.
+     Set duration to cover the number of beats you've scheduled. -->
+<script>
+  const beat = Tone.Time('4n').toSeconds();
+
+  const bass = new Tone.MonoSynth({
+    oscillator: { type: 'sawtooth' },
+    filter: { Q: 4, type: 'lowpass', rolloff: -24 },
+    envelope: { attack: 0.005, decay: 0.2, sustain: 0.6, release: 0.15 },
+    filterEnvelope: {
+      attack: 0.001, decay: 0.1, sustain: 0.4, release: 0.2,
+      baseFrequency: 80, octaves: 4
+    }
+  }).toDestination();
+  bass.volume.value = -6;
+
+  const pattern = ['E1', null, 'E1', 'G1', 'A1', null, 'B1', 'A1', 'G1', null, 'E1', 'E1'];
+  pattern.forEach((note, i) => {
+    if (note) bass.triggerAttackRelease(note, '8n', i * beat * 0.5);
+  });
+</script>

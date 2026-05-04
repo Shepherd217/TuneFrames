@@ -1,0 +1,22 @@
+<!-- TuneFrames preset: chord-progression
+     Dm → C → Bb → Am, 1 measure each.
+     Paste inside <script>. Set metadata duration to "4s" per chord (16s total for all 4). -->
+<script>
+  const measure = Tone.Time('1n').toSeconds();
+
+  const pad = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'sawtooth' },
+    envelope: { attack: 0.5, decay: 0.3, sustain: 0.7, release: 1.5 }
+  }).toDestination();
+
+  const progression = [
+    { chord: ['D3', 'F3', 'A3'], name: 'Dm' },
+    { chord: ['C3', 'E3', 'G3'], name: 'C' },
+    { chord: ['Bb2', 'D3', 'F3'], name: 'Bb' },
+    { chord: ['A2', 'C3', 'E3'], name: 'Am' },
+  ];
+
+  progression.forEach(({ chord }, i) => {
+    pad.triggerAttackRelease(chord, '1n', i * measure);
+  });
+</script>

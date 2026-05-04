@@ -1,0 +1,11 @@
+<!-- TuneFrames preset: reverb-warm
+     Long reverb chain. Paste before your instruments. -->
+<script>
+  // Reverb: long decay, high wet — lush, ambient
+  const verb = new Tone.Reverb({
+    decay: 4,
+    wet: 0.75
+  }).toDestination();
+  // Call .generate() to build the impulse response (runs at composition start)
+  verb.generate();
+</script>
