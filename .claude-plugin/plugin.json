@@ -1,0 +1,6 @@
+{
+  "name": "TuneFrames by Shepherd217",
+  "description": "Write music compositions in HTML using Tone.js. Render to MP3 with one CLI command. Built for AI agents — Tone.js for composition, headless Chrome + FFmpeg for rendering.",
+  "icon": "assets/claude-code-icon.svg",
+  "installUrl": "https://github.com/Shepherd217/TuneFrames"
+}

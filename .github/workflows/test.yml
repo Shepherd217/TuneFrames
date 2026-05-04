@@ -1,0 +1,43 @@
+name: Test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Render all examples
+        run: |
+          for ex in examples/example-*.html; do
+            name=$(basename "$ex" .html)
+            node src/cli.js render "$ex" --output "/tmp/${name}.mp3"
+          done
+
+      - name: Verify MP3 files
+        run: |
+          for ex in examples/example-*.html; do
+            name=$(basename "$ex" .html)
+            size=$(stat -f%z "/tmp/${name}.mp3" 2>/dev/null || stat -c%s "/tmp/${name}.mp3")
+            if [ "$size" -lt 5000 ]; then
+              echo "FAIL: ${name}.mp3 is only $size bytes"
+              exit 1
+            fi
+            echo "OK: ${name}.mp3 is $size bytes"
+          done

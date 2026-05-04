@@ -1,14 +1,25 @@
-# TuneFrames — Agent-Native Music Generation
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo/dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/logo/light.svg">
+    <img alt="TuneFrames" src="docs/logo/light.svg" width="300">
+  </picture>
+</p>
 
-**Write music in HTML. Render to MP3 with one CLI command.**
+<p align="center">
+  <a href="https://www.npmjs.com/package/tuneframes"><img src="https://img.shields.io/npm/v/tuneframes.svg?style=flat" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/tuneframes"><img src="https://img.shields.io/npm/dm/tuneframes.svg?style=flat" alt="npm downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="Node.js"></a>
+</p>
 
-TuneFrames ports the same portability model that made [Hyperframes](https://github.com/Shepherd217/Hyperframes) (97K npm downloads/month) successful — to audio. Every AI agent, Claude Code session, and workflow tool can now compose music without native audio code.
+<p align="center"><b>Write music in HTML. Render to MP3 with one CLI command.</b></p>
 
-```bash
-npx tuneframes init my-track
-cd my-track && tuneframes render composition.html
-# Done. my-track/output.mp3 is ready.
-```
+<p align="center">
+  <img src="docs/demo.gif" alt="TuneFrames demo — HTML code on the left, rendered MP3 on the right" width="800">
+</p>
+
+TuneFrames brings the portability model that made [Hyperframes](https://github.com/Shepherd217/Hyperframes) (97K npm downloads/month) successful — to music. Every AI agent, Claude Code session, and workflow tool can now compose music without native audio code.
 
 ---
 
@@ -24,6 +35,50 @@ Or use it directly with `npx` — no install required to try it.
 
 ## Quick Start
 
+### Option 1: With an AI coding agent (recommended)
+
+Install the TuneFrames skill, then describe what you want:
+
+```bash
+npx skills add shepherd217/tuneframes
+```
+
+Then describe the music you want:
+
+> "Create a 10-second lofi beat with a D minor chord progression, a simple piano melody, kick and snare, and warm reverb"
+
+The agent scaffolds the project, writes the Tone.js composition, and renders it to MP3.
+
+**Example prompts:**
+
+- *"Make a 30-second ambient track — lush reverb pads, slow arpeggios, D minor, 60 BPM"*
+- *"Write a driving techno track — 130 BPM, four-on-the-floor kick, offbeat hi-hats, detuned bass"*
+- *"Create a cinematic orchestral piece — strings and brass swell, 72 BPM, 8 bars"*
+- *"Generate a 5-second UI sound effect — rising tone with reverb"*
+
+### Option 2: Manual
+
+```bash
+npx tuneframes init my-track
+cd my-track
+# Edit composition.html
+tuneframes render composition.html --output my-track.mp3
+```
+
+---
+
+## Why TuneFrames?
+
+- **HTML-native** — compositions are HTML files with Tone.js. No React, no proprietary DSL.
+- **AI-first** — agents already speak HTML. The CLI is non-interactive by default, designed for agent-driven workflows.
+- **Deterministic rendering** — same input = identical output. Built for automated pipelines.
+- **Tone.js under the hood** — 814K npm downloads/month. Proven, stable, familiar.
+- **Apache 2.0** — fully open source, no per-render fees, no seat caps.
+
+---
+
+## How It Works
+
 Write a `main()` function using Tone.js:
 
 ```html
@@ -33,7 +88,7 @@ Write a `main()` function using Tone.js:
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 </head>
 <body>
-  <div id="tuneframes" style="display:none">{"bpm":120,"duration":"2s"}</div>
+  <div id="tuneframes" style="display:none">{"bpm":120,"duration":"4s"}</div>
   <script>
     async function main() {
       await Tone.start();
@@ -50,24 +105,22 @@ Write a `main()` function using Tone.js:
 Render it:
 
 ```bash
-npx tuneframes render composition.html --output my-track.mp3
+tuneframes render composition.html --output my-track.mp3
 ```
 
 ---
 
 ## Examples
 
-Run any example with `tuneframes render <path> --output <out.mp3>`.
+Run any example: `tuneframes render examples/example-<name>.html --output /tmp/<name>.mp3`
 
-**minimal** — C major arpeggio. Simplest possible composition. 120 BPM, 2s.
-
-**lofi** — Chord progression + melody with lush reverb. Lo-fi hip-hop feel. 80 BPM, 10s.
-
-**ambient** — Lush reverb pads + delayed crystal arpeggios over a D minor progression. 60 BPM, 16s.
-
-**orchestral** — Strings, brass, timpani in a layered 4-bar arrangement. 72 BPM, 14s.
-
-**techno** — 4-on-the-floor kick, offbeat hi-hats, detuned bass, pad chords. 130 BPM, 4s.
+| Example | Description | BPM | Duration |
+|---------|-------------|-----|----------|
+| **minimal** | C major arpeggio — the simplest possible composition | 120 | 2s |
+| **lofi** | Chord progression + melody + kick/snare — complete lo-fi hip-hop beat | 80 | 10s |
+| **ambient** | Lush reverb pads + delayed crystal arpeggios over D minor | 60 | 4s |
+| **orchestral** | Strings, brass, and timpani in a layered 4-bar arrangement | 72 | 4s |
+| **techno** | 4-on-the-floor kick, offbeat hi-hats, detuned bass, pad chords | 130 | 4s |
 
 ---
 
@@ -76,11 +129,13 @@ Run any example with `tuneframes render <path> --output <out.mp3>`.
 ### Metadata Block
 
 ```html
-<div id="tuneframes" style="display:none">{"bpm": 120, "duration": "10s"}</div>
+<div id="tuneframes" style="display:none">{"bpm": 120, "duration": "4s"}</div>
 ```
 
 - **bpm** — beats per minute (default: 120)
-- **duration** — render length. Use seconds (e.g. `"10s"`) for predictable results. Tone.js time notation (`"4n"`, `"2n"`, `"1m"`) is also accepted for scheduling individual events.
+- **duration** — render length in **seconds**. Use `"4s"`, `"10s"`, etc. Not `4n` notation — see note below.
+
+> **Note on duration:** `4n` in Tone.js means "4 quarter notes = 1 whole note" — it is NOT a beat count. At 120 BPM, `4n` = 2 seconds, `2n` = 1 second. Always use literal seconds (`"4s"`, `"10s"`) in the metadata block to avoid clipped renders.
 
 ### `main()` Function
 
@@ -90,20 +145,21 @@ Define an async `main()` in a `<script>` tag. TuneFrames waits for it to complet
 async function main() {
   await Tone.start();
   const synth = new Tone.Synth().toDestination();
-  synth.triggerAttackRelease('C4', '4n', 0);
   // Schedule all your notes here
 }
 ```
 
 ### Instruments
 
-Tone.js is fully available:
+All Tone.js instruments are available:
 
-- **Synth / MonoSynth / PolySynth** — basic tone generation
-- **MembraneSynth** — kick drums, toms, bass drums
-- **NoiseSynth** — white/pink/brown noise for hi-hats, snares, textures
-- **MetalSynth** — metallic percussion (cymbals, shakers)
-- **Sampler** — load your own WAV/MP3 samples
+```js
+const synth = new Tone.Synth().toDestination();           // Basic tone
+const mono = new Tone.MonoSynth().toDestination();         // Bass, lead
+const poly = new Tone.PolySynth(Tone.Synth).toDestination(); // Chords, pads
+const kick = new Tone.MembraneSynth().toDestination();     // Kick drums
+const noise = new Tone.NoiseSynth().toDestination();       // Hi-hats, snares
+```
 
 ### Effects
 
@@ -111,11 +167,12 @@ Tone.js is fully available:
 const reverb = new Tone.Reverb({ decay: 2.5, wet: 0.3 }).toDestination();
 const delay = new Tone.FeedbackDelay('8n', 0.4).toDestination();
 const comp = new Tone.Compressor(-12, 2).toDestination();
+const chorus = new Tone.Chorus(4, 2.5, 0.5).toDestination();
 ```
 
 ---
 
-## CLI
+## CLI Reference
 
 ```bash
 # Render to MP3 (default)
@@ -129,7 +186,12 @@ tuneframes preview <file.html>
 
 # Scaffold a new project
 tuneframes init my-track
+
+# Validate composition (headless render test)
+tuneframes validate <file.html>
 ```
+
+**Requirements:** Node.js >= 18, FFmpeg (`apt install ffmpeg` or `brew install ffmpeg`)
 
 ---
 
@@ -152,12 +214,12 @@ Both follow the same portability philosophy. Different domains:
 
 **Hyperframes**
 - Output: MP4 video
-- Framework: Remotion (React)
+- Framework: HTML + GSAP
 - Use case: video generation, animation
 
 **TuneFrames**
 - Output: MP3/WAV audio
-- Framework: Tone.js
+- Framework: HTML + Tone.js
 - Use case: music composition, sound design
 
 Both are deterministic, open-source, and agent-native.
