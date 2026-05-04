@@ -61,9 +61,9 @@ Run any example with `tuneframes render <path> --output <out.mp3>`.
 
 **minimal** — C major arpeggio. Simplest possible composition. 120 BPM, 2s.
 
-**lofi** — Chord progression + melody + kick/snare. Complete lo-fi hip-hop beat. 80 BPM, 10s.
+**lofi** — Chord progression + melody with lush reverb. Lo-fi hip-hop feel. 80 BPM, 10s.
 
-**ambient** — Lush reverb pads + delayed crystal arpeggios over a D minor progression. 60 BPM, 4s.
+**ambient** — Lush reverb pads + delayed crystal arpeggios over a D minor progression. 60 BPM, 16s.
 
 **orchestral** — Strings, brass, timpani in a layered 4-bar arrangement. 72 BPM, 14s.
 
