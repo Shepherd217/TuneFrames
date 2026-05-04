@@ -54,7 +54,9 @@ cd my-track && npx tuneframes render composition.html
 Run any example:
 
 ```bash
-npx tuneframes render node_modules/tuneframes/examples/example-lofi.html
+node /root/tuneframes/src/cli.js render /root/tuneframes/examples/example-lofi.html --output /tmp/lofi.mp3
+# Or after npm install -g:
+tuneframes render $(npm root -g)/tuneframes/examples/example-lofi.html --output /tmp/lofi.mp3
 ```
 
 ---
