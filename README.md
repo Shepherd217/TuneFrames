@@ -67,7 +67,7 @@ Run any example with `tuneframes render <path> --output <out.mp3>`.
 
 **orchestral** — Strings, brass, timpani in a layered 4-bar arrangement. 72 BPM, 14s.
 
-**techno** — 4-on-the-floor kick, offbeat hi-hats, detuned bass, pad chords. 130 BPM, 2s.
+**techno** — 4-on-the-floor kick, offbeat hi-hats, detuned bass, pad chords. 130 BPM, 4s.
 
 ---
 
