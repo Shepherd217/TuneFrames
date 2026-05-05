@@ -1,0 +1,13 @@
+node_modules/
+*.mp3
+*.wav
+.git/
+.github/
+examples/
+docs/
+demo.tape
+tmp/
+*.log
+.env
+.env.local
+.DS_Store

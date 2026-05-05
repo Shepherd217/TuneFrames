@@ -107,6 +107,59 @@ async function main() {
       break;
     }
 
+    case 'lint': {
+      const inputFile = args[0];
+      if (!inputFile) {
+        console.error('Usage: tuneframes lint <file.html>');
+        process.exit(1);
+      }
+      if (!fs.existsSync(inputFile)) {
+        console.error(`File not found: ${inputFile}`);
+        process.exit(1);
+      }
+
+      const content = fs.readFileSync(inputFile, 'utf8');
+      const errors = [];
+
+      // Check 1: must have <div id="tuneframes">
+      if (!content.includes('id="tuneframes"')) {
+        errors.push('Missing <div id="tuneframes"> metadata block');
+      }
+
+      // Check 2: metadata must be valid JSON
+      const metaMatch = content.match(/id="tuneframes"[^>]*>([^<]+)<\/div>/);
+      if (metaMatch) {
+        try {
+          JSON.parse(metaMatch[1].trim());
+        } catch (e) {
+          errors.push(`Invalid JSON in metadata block: ${e.message}`);
+        }
+      }
+
+      // Check 3: must load Tone.js
+      if (!content.includes('Tone.js') && !content.includes('tone')) {
+        errors.push('No Tone.js script reference found');
+      }
+
+      // Check 4: must have async function main()
+      if (!content.includes('async function main()')) {
+        errors.push('Missing async function main()');
+      }
+
+      // Check 5: main() should contain await Tone.start()
+      if (content.includes('async function main()') && !content.includes('Tone.start()')) {
+        errors.push('main() should call await Tone.start()');
+      }
+
+      if (errors.length === 0) {
+        console.log(`OK: ${inputFile}`);
+      } else {
+        errors.forEach(e => console.error(`FAIL: ${e}`));
+        process.exit(1);
+      }
+      break;
+    }
+
     case 'add': {
       const [presetName] = args;
       if (!presetName) {
@@ -142,7 +195,7 @@ async function main() {
     }
 
     default:
-      console.log(`TuneFrames CLI\n\nCommands:\n  tuneframes render <file.html>  Render composition to MP3\n  tuneframes init <name>         Initialize new project\n  tuneframes preview <file.html> Open in browser\n  tuneframes validate <file.html> Validate composition (headless test render)\n  tuneframes add <preset>         Add preset to composition.html\n\nPresets: ${PRESETS.join(', ')}`);
+      console.log(`TuneFrames CLI\n\nCommands:\n  tuneframes render <file.html>  Render composition to MP3\n  tuneframes init <name>         Initialize new project\n  tuneframes preview <file.html> Open in browser\n  tuneframes validate <file.html> Validate composition (headless test render)\n  tuneframes lint <file.html>    Lint composition (static HTML analysis)\n  tuneframes add <preset>         Add preset to composition.html\n\nPresets: ${PRESETS.join(', ')}`);
   }
 }
 
