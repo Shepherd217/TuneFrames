@@ -23,10 +23,15 @@ async function main() {
   switch (cmd) {
     case 'render': {
       const inputFile = args[0];
-      const outputArg = args.find(a => a.startsWith('--output='));
-      const outputFile = outputArg
-        ? outputArg.split('=')[1]
+      const equalsArg = args.find(a => a.startsWith('--output='));
+      const separateIdx = args.indexOf('--output');
+      const formatIdx = args.indexOf('--format');
+      const outputFile = equalsArg
+        ? equalsArg.split('=')[1]
+        : separateIdx !== -1 && args[separateIdx + 1] && !args[separateIdx + 1].startsWith('--')
+        ? args[separateIdx + 1]
         : inputFile.replace(/\.html$/, '.mp3');
+      const outputFormat = formatIdx !== -1 && args[formatIdx + 1] ? args[formatIdx + 1] : 'mp3';
 
       if (!inputFile) {
         console.error('Usage: tuneframes render <file.html> [--output=track.mp3] [--format wav]');
@@ -39,7 +44,7 @@ async function main() {
       }
 
       console.log(`Rendering ${inputFile} → ${outputFile}`);
-      const result = await render(inputFile, outputFile);
+      const result = await render(inputFile, outputFile, outputFormat);
       console.log(`Done. Output: ${result.output}`);
       break;
     }
