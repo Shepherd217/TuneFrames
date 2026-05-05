@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Piano</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":100,"duration":"5s"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      const beat = Tone.Time('4n').toSeconds();
+
+      const piano = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.005, decay: 0.3, sustain: 0.3, release: 1.2 }
+      }).toDestination();
+      piano.volume.value = -8;
+
+      // Dm - Am - Bb - F chord progression, 2 bars each
+      const chords = [
+        ['D3', 'F3', 'A3'],   // Dm
+        ['A2', 'C3', 'E3'],   // Am
+        ['Bb2', 'D3', 'F3'],  // Bb
+        ['F2', 'A2', 'C3']    // F
+      ];
+
+      chords.forEach((chord, i) => {
+        piano.triggerAttackRelease(chord, '2n', i * 2 * beat);
+      });
+
+      // Melodic line: simple pentatonic over the changes
+      const melody = [
+        { note: 'D4', time: 0 },
+        { note: 'F4', time: beat },
+        { note: 'A4', time: beat * 2 },
+        { note: 'C4', time: 2 * beat },
+        { note: 'E4', time: 2.5 * beat },
+        { note: 'D4', time: 3 * beat },
+        { note: 'F4', time: 4 * beat },
+        { note: 'G4', time: 4.5 * beat },
+        { note: 'A4', time: 5 * beat },
+        { note: 'Bb4', time: 6 * beat },
+        { note: 'F4', time: 7 * beat }
+      ];
+
+      melody.forEach(({ note, time }) => {
+        if (time < 5) piano.triggerAttackRelease(note, '8n', time);
+      });
+    }
+  </script>
+</body>
+</html>

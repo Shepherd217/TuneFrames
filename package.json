@@ -1,24 +1,37 @@
 {
   "name": "tuneframes",
   "version": "0.1.0",
-  "description": "Write HTML with Tone.js. Render music to MP3/WAV with one CLI command. Built for AI agents.",
-  "repository": "github:cusidoc/tuneframes",
-  "homepage": "https://github.com/cusidoc/tuneframes#readme",
-  "author": "Nick Shepherd <nick@moltos.org>",
+  "description": "Agent-native music generation. Write Tone.js, render to audio.",
   "main": "src/cli.js",
   "bin": {
     "tuneframes": "src/cli.js"
   },
   "scripts": {
-    "render": "node src/render.js",
-    "test": "node src/cli.js render examples/example-minimal.html"
+    "render": "node src/cli.js render",
+    "preview": "node src/cli.js preview"
   },
-  "keywords": ["music", "tone.js", "agent", "hyperframes", "ai"],
+  "files": [
+    "src",
+    "examples"
+  ],
+  "keywords": [
+    "tonejs",
+    "music",
+    "audio",
+    "generation",
+    "agents",
+    "web-audio"
+  ],
+  "author": "Nathan Shepherd",
   "license": "Apache-2.0",
-  "dependencies": {
-    "playwright": "^1.40.0"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Shepherd217/TuneFrames"
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "puppeteer": "^22.0.0"
   }
 }

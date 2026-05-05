@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Bass</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":120,"duration":"4s"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      const beat = Tone.Time('4n').toSeconds(); // 0.5s at 120 BPM
+
+      // Warm, rounded bass tone
+      const bass = new Tone.MonoSynth({
+        oscillator: { type: 'sawtooth' },
+        filter: { Q: 2, type: 'lowpass', rolloff: -12 },
+        envelope: { attack: 0.01, decay: 0.2, sustain: 0.4, release: 0.3 },
+        filterEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.2, baseFrequency: 100, octaves: 2 }
+      }).toDestination();
+      bass.volume.value = -6;
+
+      // Walking bass line: beats 0-4 (0 to 2s) = Dm, beats 4-7 (2 to 3.5s) = Gm
+      // All notes scheduled within duration=4s — notes at time >= 4s are dropped
+      const walk = [
+        // Bar 1 — Dm: root, 5th, 7th, root / approach, 3rd, 4th, 5th, root
+        { note: 'D2', time: 0 },
+        { note: 'A2', time: beat },
+        { note: 'C3', time: 2 * beat },
+        { note: 'D3', time: 3 * beat },
+        { note: 'E2', time: 4 * beat },
+        { note: 'F2', time: 5 * beat },
+        { note: 'G2', time: 6 * beat },
+        { note: 'A2', time: 7 * beat },
+        // Bar 2 — Gm: root, 5th, 7th, root
+        { note: 'G2', time: 8 * beat },
+        { note: 'D3', time: 9 * beat },
+        { note: 'F3', time: 10 * beat },
+        { note: 'G3', time: 11 * beat }
+      ];
+
+      walk.forEach(({ note, time }) => {
+        if (time < 4) bass.triggerAttackRelease(note, '8n', time);
+      });
+    }
+  </script>
+</body>
+</html>
