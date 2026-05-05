@@ -12,7 +12,9 @@
   },
   "files": [
     "src",
-    "examples"
+    "examples",
+    "registry",
+    "skills"
   ],
   "keywords": [
     "tonejs",
