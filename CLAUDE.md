@@ -12,11 +12,13 @@ src/
   render.js    — Headless Chromium → WAV → FFmpeg pipeline
 
 examples/
-  example-minimal.html    — 2s C major arpeggio
-  example-lofi.html       — 10s lo-fi beat
-  example-ambient.html     — 4s reverb pads
-  example-orchestral.html  — 4s strings/brass/timpani
-  example-techno.html     — 4s techno loop
+  example-minimal.html    — 2s C major arpeggio, 120 BPM
+  example-lofi.html       — 10s lo-fi beat, 80 BPM
+  example-ambient.html    — 16s reverb pads + arpeggio, 60 BPM
+  example-orchestral.html — 14s strings/brass/timpani, 72 BPM
+  example-techno.html     — 4s techno loop, 130 BPM
+  example-piano.html      — 5s solo piano, 100 BPM
+  example-bass.html       — 4s deep bass, 120 BPM
 
 skills/
   tuneframes/       — Tone.js composition patterns for AI agents

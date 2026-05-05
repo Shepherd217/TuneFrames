@@ -48,39 +48,21 @@ tuneframes init my-track
 ## Example
 
 ```html
+<div id="tuneframes" style="display:none">{"bpm":120,"duration":"4s"}</div>
 <script src="https://unpkg.com/tone@14.7.77/build/Tone.js"></script>
 <script>
-  // Define 4-bar chord progression
-  const chords = [
-    ['C4', 'E4', 'G4'],  // C major
-    ['A3', 'C4', 'E4'],  // A minor
-    ['F3', 'A3', 'C4'],  // F major
-    ['G3', 'B3', 'D4'],  // G major
-  ];
-
-  const synth = new Tone.PolySynth(Tone.Synth).toDestination();
-  const seq = new Tone.Sequence((time, note) => {
-    synth.triggerAttackRelease(note, '4n', time);
-  }, chords.flat()).start(0);
-
-  Tone.Transport.start();
-
-  // Render with Tone.Offline
-  Tone.Offline(() => {
-    new Tone.PolySynth(Tone.Synth).toDestination();
-    new Tone.Sequence((time, note) => {
-      synth.triggerAttackRelease(note, '4n', time);
-    }, chords.flat()).start(0);
-    Tone.Transport.start();
-  }, 8).then(buffer => {
-    const wav = audioBufferToWav(buffer);
-    writeFile('track.wav', Buffer.from(wav));
-  });
-
-  // Expose writeFile to the browser
-  function audioBufferToWav(buffer) { /* included by tuneframes */ }
+  async function main() {
+    await Tone.start();
+    const synth = new Tone.Synth().toDestination();
+    synth.triggerAttackRelease('C4', '4n', 0);
+    synth.triggerAttackRelease('E4', '4n', '4n');
+    synth.triggerAttackRelease('G4', '4n', '2n');
+    synth.triggerAttackRelease('C5', '2n', '4n');
+  }
 </script>
 ```
+
+`tuneframes render track.html --output track.mp3` — Tone.js CDN loads automatically; `renderComposition()` is auto-defined.
 
 See [`examples/`](examples/) for full compositions — ambient, lo-fi, techno, orchestral, piano, and bass.
 
@@ -95,13 +77,14 @@ See [`examples/`](examples/) for full compositions — ambient, lo-fi, techno, o
 
 ## Comparison
 
-| | TuneFrames | Suno API | ElevenLabs |
-|---|---|---|---|
-| Open source | ✓ | ✗ | ✗ |
-| Per-render fee | None | Yes | Yes |
-| Agent-native | ✓ | Wrapper | Wrapper |
-| Full audio control | ✓ | Limited | Limited |
-| Deterministic output | ✓ | ✗ | ✗ |
+| | TuneFrames | Hyperframes | Suno API | ElevenLabs |
+|---|---|---|---|---|
+| Open source | ✓ | ✓ | ✗ | ✗ |
+| Per-render fee | None | None | Yes | Yes |
+| Agent-native | ✓ | ✓ | Wrapper | Wrapper |
+| Full audio/video control | ✓ | ✓ | Limited | Limited |
+| Deterministic output | ✓ | ✓ | ✗ | ✗ |
+| Modality | Audio | Video | Audio | Audio |
 
 ---
 

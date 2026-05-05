@@ -30,7 +30,7 @@ TuneFrames uses `Tone.Offline` — Tone.js's headless rendering context. No audi
 HTML + Tone.js → Chromium (Tone.Offline) → WAV → FFmpeg → MP3/WAV
 ```
 
-Five built-in examples cover the range: a simple synth melody, a lo-fi chord progression with melody, driving techno, textural ambient, and a layered orchestral arrangement.
+Seven built-in examples cover the range: a simple synth melody, a lo-fi chord progression with melody, driving techno, textural ambient, a layered orchestral arrangement, a solo piano piece, and a deep bass line.
 
 ```html
 <div id="tuneframes" style="display:none">{"bpm":80,"duration":"10s"}</div>
@@ -77,8 +77,8 @@ This is the MoltOS philosophy — agent identity and capabilities that move with
 
 TuneFrames is live on npm: **https://www.npmjs.com/package/tuneframes**
 
-Five examples included. Apache 2.0 license. No API key required. No per-render fees.
+Seven examples included. Apache 2.0 license. No API key required. No per-render fees.
 
-GitHub: **https://github.com/cusidoc/tuneframes**
+GitHub: **https://github.com/Shepherd217/TuneFrames**
 
 Built in one session because it needed to exist. Feedback welcome.

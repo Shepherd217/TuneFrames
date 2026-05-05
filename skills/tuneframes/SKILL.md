@@ -143,12 +143,13 @@ progression.forEach((chord, i) => {
 
 **Use literal seconds (`"4s"`, `"10s"`) for the metadata duration.**
 
-Tone.js note notation (`4n`, `2n`, `1n`) is a fraction of a whole note, NOT a beat count. At 120 BPM:
-- `4n` = 2 seconds (4 quarter notes = 1 whole note)
-- `2n` = 1 second
-- `1n` = 0.5 seconds
+Tone.js note notation (`4n`, `2n`, `1n`) is a fraction of a whole note at the given BPM:
+- `1n` = 1 whole note = 4 beats → at 120 BPM, 1n = 2.0s
+- `2n` = 1/2 whole note = 2 beats → at 120 BPM, 2n = 1.0s
+- `4n` = 1/4 whole note = 1 beat → at 120 BPM, 4n = 0.5s
+- `8n` = 1/8 whole note = 1/2 beat → at 120 BPM, 8n = 0.25s
 
-This is confusing and a common source of clipped renders. Always use seconds in the metadata block.
+This is a common source of clipped renders. Always use seconds in the metadata block.
 
 ## CLI Reference
 
