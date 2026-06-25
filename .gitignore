@@ -31,4 +31,4 @@ Thumbs.db
 
 # Lock files (we use package-lock.json)
 # yarn.lock
-# pnpm-lock.yaml
+# pnpm-lock.yaml.npmrc

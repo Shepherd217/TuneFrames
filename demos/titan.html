@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Titan (Dark Cinematic)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":72,"duration":"22s"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 72;
+
+      const bar = Tone.Time('1m').toSeconds();
+      const q   = Tone.Time('4n').toSeconds();
+      const e   = Tone.Time('8n').toSeconds();
+      const s   = Tone.Time('16n').toSeconds();
+
+      // Master chain
+      const lim  = new Tone.Limiter(-1).toDestination();
+      const comp = new Tone.Compressor({ threshold: -18, ratio: 5, attack: 0.005, release: 0.3 }).connect(lim);
+      const delay = new Tone.FeedbackDelay({ delayTime: '4n', feedback: 0.3, wet: 0.22 }).connect(comp);
+      const chorus = new Tone.Chorus({ frequency: 0.4, delayTime: 5, depth: 0.5, wet: 0.35 }).connect(delay);
+      chorus.start();
+
+      // SUB DRONE — deep sine, sets the ominous foundation
+      const sub = new Tone.Synth({
+        oscillator: { type: 'sine' },
+        envelope: { attack: 2.0, decay: 0.5, sustain: 1.0, release: 3.0 }
+      }).connect(comp);
+      sub.volume.value = -6;
+
+      // STRINGS — slow-attack AMSynth for sweeping string pads
+      const strings = new Tone.PolySynth(Tone.AMSynth, {
+        harmonicity: 1,
+        oscillator: { type: 'sawtooth4' },
+        envelope: { attack: 1.8, decay: 0.5, sustain: 0.9, release: 4.0 },
+        modulation: { type: 'sine' },
+        modulationEnvelope: { attack: 2.0, decay: 0.5, sustain: 0.8, release: 2.0 }
+      }).connect(chorus);
+      strings.volume.value = -14;
+
+      // BRASS — sharp PolySynth stabs, powerful
+      const brass = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.04, decay: 0.15, sustain: 0.85, release: 0.5 }
+      }).connect(delay);
+      brass.volume.value = -10;
+
+      // TIMPANI — deep MembraneSynth, low-tuned, powerful hits
+      const timps = new Tone.MembraneSynth({
+        pitchDecay: 0.25, octaves: 5,
+        envelope: { attack: 0.001, decay: 0.8, sustain: 0, release: 0.5 }
+      }).connect(comp);
+      timps.volume.value = -6;
+
+      // TAIKO — mid-range drum hit for rhythmic drive
+      const taiko = new Tone.MembraneSynth({
+        pitchDecay: 0.1, octaves: 3,
+        envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.2 }
+      }).connect(comp);
+      taiko.volume.value = -10;
+
+      // RISER — white noise swell that builds into each section
+      const riserFlt = new Tone.Filter({ frequency: 800, type: 'highpass' }).connect(delay);
+      const riser = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 1.5, decay: 0.3, sustain: 0.6, release: 0.8 }
+      }).connect(riserFlt);
+      riser.volume.value = -28;
+
+      // IMPACTS — low-mid noise bursts on accents
+      const impFlt = new Tone.Filter({ frequency: 300, type: 'lowpass' }).connect(comp);
+      const impact = new Tone.NoiseSynth({
+        noise: { type: 'brown' },
+        envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.3 }
+      }).connect(impFlt);
+      impact.volume.value = -8;
+
+      // ── ARRANGEMENT ────────────────────────────────────────────────────
+      // 22s at 72 BPM → bar = 3.33s → ~6.6 bars → 7 bars
+      // Progression: Dm – Bb – F – A7 (ominous, unresolved)
+      const prog = [
+        { strings: ['D3','F3','A3','C4'], root: 'D2',  brass: ['D4','F4','A4'] },
+        { strings: ['Bb2','D3','F3','Ab3'], root: 'Bb1', brass: ['Bb3','D4','F4'] },
+        { strings: ['F2','A2','C3','E3'], root: 'F2',  brass: ['F3','A3','C4'] },
+        { strings: ['A2','C#3','E3','G3'], root: 'A1',  brass: ['A3','C#4','E4'] },
+      ];
+
+      // Sub drone: D1 whole track (tonic pedal)
+      sub.triggerAttackRelease('D1', '8s', 0);
+
+      // Strings enter bar 0, slow swell
+      for (let b = 0; b < 7; b++) {
+        const p = prog[b % 4];
+        strings.triggerAttackRelease(p.strings, '1n', b * bar);
+      }
+
+      // Timpani: sparse, dramatic — beats 1 and 3 from bar 1
+      const timpsHits = [
+        { t: 1*bar,          n: 'D2' },
+        { t: 1*bar + 2*q,    n: 'A2' },
+        { t: 2*bar,          n: 'D2' },
+        { t: 2*bar + 2*q,    n: 'F2' },
+        { t: 3*bar,          n: 'Bb1' },
+        { t: 3*bar + 2*q,    n: 'D2' },
+        { t: 4*bar,          n: 'F2' },
+        { t: 4*bar + 2*q,    n: 'A2' },
+        { t: 5*bar,          n: 'A1' },
+        { t: 5*bar + 2*q,    n: 'E2' },
+        { t: 6*bar,          n: 'D2' },
+        { t: 6*bar + 2*q,    n: 'D2' },
+      ];
+      timpsHits.forEach(({ t, n }) => timps.triggerAttackRelease(n, '4n', t));
+
+      // Taiko: rhythmic 8th drive enters bar 2
+      for (let b = 2; b < 7; b++) {
+        const t = b * bar;
+        // Half-time feel: hit on 1 and 3
+        taiko.triggerAttackRelease('A2', '8n', t);
+        taiko.triggerAttackRelease('A2', '8n', t + 2*q);
+        // 16th-note fills on last beat of bars 3, 5
+        if (b === 3 || b === 5) {
+          [3*q, 3*q+s, 3*q+2*s, 3*q+3*s].forEach(off => {
+            taiko.triggerAttackRelease('A2', '16n', t + off);
+          });
+        }
+      }
+
+      // Brass stabs: enter bar 2, on strong beats
+      const brassHits = [
+        { t: 2*bar,          b: 0 },
+        { t: 2*bar + 2*q,    b: 0 },
+        { t: 3*bar,          b: 1 },
+        { t: 3*bar + 2*q,    b: 1 },
+        { t: 4*bar,          b: 2 },
+        { t: 4*bar + q,      b: 2 },
+        { t: 4*bar + 2*q,    b: 2 },
+        { t: 5*bar,          b: 3 },
+        { t: 5*bar + 2*q,    b: 3 },
+        // Climax: rapid stabs at bar 6
+        { t: 6*bar,          b: 0 },
+        { t: 6*bar + e,      b: 0 },
+        { t: 6*bar + q,      b: 1 },
+        { t: 6*bar + q + e,  b: 2 },
+        { t: 6*bar + 2*q,    b: 3 },
+        { t: 6*bar + 3*q,    b: 0 },
+      ];
+      brassHits.forEach(({ t, b }) => {
+        brass.triggerAttackRelease(prog[b % 4].brass, '8n', t);
+      });
+
+      // Impacts: hit on strong structural moments
+      [0, 2*bar, 4*bar, 6*bar].forEach(t => impact.triggerAttackRelease('8n', t));
+
+      // Riser: swells into bar 2 and bar 5
+      riser.triggerAttackRelease('2n', 2*bar - 1.5);
+      riser.triggerAttackRelease('2n', 5*bar - 1.5);
+    }
+    main();
+  </script>
+</body>
+</html>

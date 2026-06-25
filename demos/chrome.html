@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Chrome (Synthwave)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":118,"duration":"24s"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 118;
+
+      const bar = Tone.Time('1m').toSeconds();
+      const q   = Tone.Time('4n').toSeconds();
+      const e   = Tone.Time('8n').toSeconds();
+      const s   = Tone.Time('16n').toSeconds();
+
+      // Master chain
+      const lim  = new Tone.Limiter(-1).toDestination();
+      const comp = new Tone.Compressor({ threshold: -16, ratio: 4, attack: 0.003, release: 0.25 }).connect(lim);
+
+      // Space: delay + chorus (replaces reverb for headless rendering)
+      const delay  = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.38, wet: 0.28 }).connect(comp);
+      const chorus = new Tone.Chorus({ frequency: 0.7, delayTime: 3.5, depth: 0.6, wet: 0.42 }).connect(delay);
+      chorus.start();
+
+      // CHORD PADS — detuned sawtooth for that classic synthwave wall of sound
+      const pads = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth4' },
+        envelope: { attack: 1.4, decay: 0.5, sustain: 0.95, release: 4.0 }
+      }).connect(chorus);
+      pads.volume.value = -19;
+
+      // ARPEGGIO — triangle8, plucky, runs on top of pads
+      const arp = new Tone.Synth({
+        oscillator: { type: 'triangle8' },
+        envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.08 }
+      }).connect(delay);
+      arp.volume.value = -21;
+
+      // BASS — aggressive portamento sawtooth with filter envelope
+      const bass = new Tone.MonoSynth({
+        oscillator: { type: 'sawtooth' },
+        filter: { Q: 5, type: 'lowpass', rolloff: -24 },
+        filterEnvelope: { attack: 0.001, decay: 0.22, sustain: 0.38, release: 0.32,
+                          baseFrequency: 55, octaves: 3.8 },
+        envelope: { attack: 0.001, decay: 0.08, sustain: 0.85, release: 0.28 },
+        portamento: 0.04
+      }).connect(comp);
+      bass.volume.value = -4;
+
+      // LEAD — FM synth, soaring sawtooth carrier
+      const lead = new Tone.FMSynth({
+        harmonicity: 2, modulationIndex: 9,
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.02, decay: 0.2, sustain: 0.78, release: 1.4 },
+        modulation: { type: 'sine' },
+        modulationEnvelope: { attack: 0.6, decay: 0.2, sustain: 0.5, release: 0.6 }
+      }).connect(delay);
+      lead.volume.value = -8;
+
+      // KICK — punchy 4-on-floor
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.055, octaves: 8,
+        envelope: { attack: 0.001, decay: 0.32, sustain: 0, release: 0.15 }
+      }).connect(comp);
+      kick.volume.value = -5;
+
+      // SNARE — white noise + bandpass
+      const snareFlt = new Tone.Filter(2800, 'bandpass').connect(comp);
+      const snare = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.14, sustain: 0, release: 0.06 }
+      }).connect(snareFlt);
+      snare.volume.value = -13;
+
+      // HI-HATS — tight, 16th-note grid
+      const hatFlt = new Tone.Filter(9500, 'highpass').connect(comp);
+      const hat = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.048, sustain: 0, release: 0.022 }
+      }).connect(hatFlt);
+      hat.volume.value = -26;
+
+      // OPEN HAT — every 2 beats for groove
+      const ohatFlt = new Tone.Filter(7000, 'highpass').connect(comp);
+      const ohat = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.22, sustain: 0.05, release: 0.1 }
+      }).connect(ohatFlt);
+      ohat.volume.value = -22;
+
+      // Chord progression: Am7 – Fmaj7 – Cmaj7 – G7 (classic minor synthwave)
+      const prog = [
+        { chord: ['A3','C4','E4','G4'], root: 'A2',
+          arpNotes: ['A4','C5','E5','G5','E5','C5','A4','E5'] },
+        { chord: ['F3','A3','C4','E4'], root: 'F2',
+          arpNotes: ['F4','A4','C5','E5','C5','A4','F4','A4'] },
+        { chord: ['C3','E3','G3','B3'], root: 'C3',
+          arpNotes: ['C4','E4','G4','B4','G4','E4','C4','G4'] },
+        { chord: ['G3','B3','D4','F4'], root: 'G2',
+          arpNotes: ['G4','B4','D5','F5','D5','B4','G4','B4'] },
+      ];
+
+      // Total bars: 24s at 118 BPM → ~11.8 bars → 12 bars
+      for (let b = 0; b < 12; b++) {
+        const p = prog[b % 4];
+        const t = b * bar;
+
+        // Pads: full track
+        pads.triggerAttackRelease(p.chord, '1n', t);
+
+        // Arp: intro + build (bars 0–5), then drop out when lead comes in
+        if (b < 6) {
+          p.arpNotes.forEach((note, i) => arp.triggerAttackRelease(note, '8n', t + i * e));
+        }
+
+        // Bass: bars 2 onward
+        if (b >= 2) {
+          // Driving 8th-note pulse with syncopation
+          [0, e, q, q+e, 2*q, 2*q+e, 3*q, 3*q+e].forEach(off => {
+            bass.triggerAttackRelease(p.root, '8n', t + off);
+          });
+        }
+
+        // Drums: bars 2 onward
+        if (b >= 2) {
+          for (let i = 0; i < 4; i++) kick.triggerAttackRelease('C1', '8n', t + i * q);
+          snare.triggerAttackRelease('8n', t + q);
+          snare.triggerAttackRelease('8n', t + 3 * q);
+          for (let i = 0; i < 16; i++) hat.triggerAttackRelease('16n', t + i * s);
+          ohat.triggerAttackRelease('8n', t + q + e);    // "and" of 2
+          ohat.triggerAttackRelease('8n', t + 3*q + e);  // "and" of 4
+        }
+      }
+
+      // Lead melody: bars 6–11 (two full passes of the 4-bar Am phrase)
+      // Singable minor melody with passing tones
+      const phrase = [
+        // Bar 0 of phrase — Am7
+        { off: 0,           n: 'A4',  d: '4n'  },
+        { off: q,           n: 'C5',  d: '8n'  },
+        { off: q + e,       n: 'B4',  d: '8n'  },
+        { off: 2*q,         n: 'A4',  d: '4n.' },
+        { off: 3*q + e,     n: 'G4',  d: '8n'  },
+        // Bar 1 of phrase — Fmaj7
+        { off: bar,         n: 'F4',  d: '4n'  },
+        { off: bar + q,     n: 'A4',  d: '8n'  },
+        { off: bar + q + e, n: 'G4',  d: '8n'  },
+        { off: bar + 2*q,   n: 'E4',  d: '2n'  },
+        // Bar 2 of phrase — Cmaj7 (ascending)
+        { off: 2*bar,           n: 'E4',  d: '4n'  },
+        { off: 2*bar + q,       n: 'G4',  d: '8n'  },
+        { off: 2*bar + q + e,   n: 'A4',  d: '8n'  },
+        { off: 2*bar + 2*q,     n: 'G4',  d: '8n'  },
+        { off: 2*bar + 2*q + e, n: 'E4',  d: '8n'  },
+        { off: 2*bar + 3*q,     n: 'D4',  d: '4n'  },
+        // Bar 3 of phrase — G7 (resolves to Am)
+        { off: 3*bar,         n: 'B4',  d: '4n'  },
+        { off: 3*bar + q,     n: 'D5',  d: '8n'  },
+        { off: 3*bar + q + e, n: 'C5',  d: '8n'  },
+        { off: 3*bar + 2*q,   n: 'A4',  d: '2n'  },
+      ];
+
+      // Play the 4-bar phrase from bar 6, then repeat transposed up a 3rd from bar 10
+      phrase.forEach(({ off, n, d }) => lead.triggerAttackRelease(n, d, 6 * bar + off));
+
+      // Second pass: phrase repeats bar 10–11 (octave jump on high points)
+      phrase.slice(0, 9).forEach(({ off, n, d }) => {
+        // Transpose up an octave for the climax
+        const note = Tone.Frequency(n).transpose(12).toNote();
+        lead.triggerAttackRelease(note, d, 10 * bar + off);
+      });
+    }
+    main();
+  </script>
+</body>
+</html>

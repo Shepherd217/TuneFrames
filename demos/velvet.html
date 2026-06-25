@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Velvet (Neo-Soul)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":88,"duration":"22s"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 88;
+
+      const bar = Tone.Time('1m').toSeconds();
+      const q   = Tone.Time('4n').toSeconds();
+      const e   = Tone.Time('8n').toSeconds();
+      const s   = Tone.Time('16n').toSeconds();
+
+      // Master chain
+      const lim  = new Tone.Limiter(-1).toDestination();
+      const comp = new Tone.Compressor({ threshold: -20, ratio: 3, attack: 0.008, release: 0.18 }).connect(lim);
+      const delay  = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.2, wet: 0.18 }).connect(comp);
+      const chorus = new Tone.Chorus({ frequency: 1.4, delayTime: 3.5, depth: 0.4, wet: 0.38 }).connect(delay);
+      chorus.start();
+
+      // RHODES — warm triangle oscillator, slow attack, breathy
+      const rhodes = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.028, decay: 0.5, sustain: 0.65, release: 2.8 }
+      }).connect(chorus);
+      rhodes.volume.value = -10;
+
+      // PAD LAYER — subtle saw pad underneath for warmth
+      const pad = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sine' },
+        envelope: { attack: 2.0, decay: 0.5, sustain: 0.85, release: 4.0 }
+      }).connect(chorus);
+      pad.volume.value = -24;
+
+      // BASS — fingered sine bass, punchy
+      const bass = new Tone.MonoSynth({
+        oscillator: { type: 'sine' },
+        filter: { Q: 2, type: 'lowpass', rolloff: -12 },
+        filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.6, release: 0.3,
+                          baseFrequency: 80, octaves: 2 },
+        envelope: { attack: 0.014, decay: 0.18, sustain: 0.52, release: 0.3 }
+      }).connect(comp);
+      bass.volume.value = -5;
+
+      // MELODY — breathy triangle, like a vocal line
+      const mel = new Tone.Synth({
+        oscillator: { type: 'triangle8' },
+        envelope: { attack: 0.045, decay: 0.3, sustain: 0.55, release: 2.0 }
+      }).connect(delay);
+      mel.volume.value = -10;
+
+      // KICK — soft, roomy
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.055, octaves: 5,
+        envelope: { attack: 0.001, decay: 0.32, sustain: 0, release: 0.22 }
+      }).connect(comp);
+      kick.volume.value = -14;
+
+      // SNARE — brushed, with narrow bandpass
+      const snareBp = new Tone.Filter(2200, 'bandpass').connect(comp);
+      const snare = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.003, decay: 0.1, sustain: 0, release: 0.06 }
+      }).connect(snareBp);
+      snare.volume.value = -21;
+
+      // HAT — open-ish, 8th notes
+      const hatFlt = new Tone.Filter(7500, 'highpass').connect(comp);
+      const hat = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.07, sustain: 0, release: 0.04 }
+      }).connect(hatFlt);
+      hat.volume.value = -26;
+
+      // Chord progression: Fm9 – Dbmaj7 – Abmaj7 – Eb7
+      const prog = [
+        { chord: ['F3','Ab3','C4','Eb4'], root: 'F2'  },
+        { chord: ['Db3','F3','Ab3','C4'], root: 'Db2' },
+        { chord: ['Ab2','C3','Eb3','G3'], root: 'Ab1' },
+        { chord: ['Eb3','G3','Bb3','Db4'], root: 'Eb2' },
+      ];
+
+      // 8 bars total (22s at 88 BPM = ~8.07 bars)
+      for (let b = 0; b < 8; b++) {
+        const p = prog[b % 4];
+        const t = b * bar;
+
+        // Rhodes: full track
+        rhodes.triggerAttackRelease(p.chord, '1n', t);
+
+        // Pad: enters quietly from bar 0
+        pad.triggerAttackRelease(p.chord, '1n', t);
+
+        // Bass: bars 2 onward — syncopated neo-soul groove
+        if (b >= 2) {
+          bass.triggerAttackRelease(p.root, '8n', t);                  // beat 1
+          bass.triggerAttackRelease(p.root, '8n', t + q + s);          // "e" of 2
+          bass.triggerAttackRelease(p.root, '8n', t + 2*q);            // beat 3
+          bass.triggerAttackRelease(p.root, '8n', t + 3*q + s*2);      // anticipates 4
+          // fill at end of bar
+          if (b % 2 === 1) {
+            bass.triggerAttackRelease(p.root, '16n', t + 4*q - s);
+          }
+        }
+
+        // Drums: bars 2 onward
+        if (b >= 2) {
+          kick.triggerAttackRelease('C1', '8n', t);               // beat 1
+          if (b % 2 === 0) {
+            kick.triggerAttackRelease('C1', '16n', t + q + e);    // ghost on "and" of 2 (before beat 3)
+          }
+          kick.triggerAttackRelease('C1', '8n', t + 2*q);         // beat 3
+          snare.triggerAttackRelease('8n', t + q);                // beat 2
+          snare.triggerAttackRelease('8n', t + 3*q);              // beat 4
+          // All hat events sorted chronologically — StateTimeline requires monotonic order
+          const hatTimes = [];
+          for (let i = 0; i < 8; i++) hatTimes.push(t + i * e);
+          hatTimes.push(t + 2*q - s);   // 16th push into beat 3 (t + 1.75q)
+          hatTimes.sort((a, b) => a - b);
+          hatTimes.forEach(ht => hat.triggerAttackRelease('16n', ht));
+        }
+      }
+
+      // Melody: bars 2–7 (F minor pentatonic + chromatic passing tones)
+      const melNotes = [
+        // Bar 2 — Fm (call)
+        { off: 0,               n: 'C5',   d: '4n'  },
+        { off: q,               n: 'Ab4',  d: '8n'  },
+        { off: q + e,           n: 'Bb4',  d: '8n'  },
+        { off: 2*q,             n: 'Ab4',  d: '4n.' },
+        { off: 3*q + e,         n: 'F4',   d: '8n'  },
+        // Bar 3 — Dbmaj7 (response, up)
+        { off: bar,             n: 'Db5',  d: '4n'  },
+        { off: bar + q,         n: 'C5',   d: '8n'  },
+        { off: bar + q + e,     n: 'Bb4',  d: '8n'  },
+        { off: bar + 2*q,       n: 'Ab4',  d: '2n'  },
+        // Bar 4 — Abmaj7 (reaching)
+        { off: 2*bar,           n: 'Bb4',  d: '4n'  },
+        { off: 2*bar + q,       n: 'C5',   d: '8n'  },
+        { off: 2*bar + q + e,   n: 'Db5',  d: '8n'  },
+        { off: 2*bar + 2*q,     n: 'C5',   d: '8n'  },
+        { off: 2*bar + 2*q + e, n: 'Bb4',  d: '8n'  },
+        { off: 2*bar + 3*q,     n: 'Ab4',  d: '4n'  },
+        // Bar 5 — Eb7 (tension)
+        { off: 3*bar,           n: 'G4',   d: '4n.' },
+        { off: 3*bar + q + e,   n: 'Eb4',  d: '8n'  },
+        { off: 3*bar + 2*q,     n: 'F4',   d: '2n'  },
+        // Bar 6 — Fm (return, higher)
+        { off: 4*bar,           n: 'F4',   d: '4n'  },
+        { off: 4*bar + q,       n: 'Ab4',  d: '8n'  },
+        { off: 4*bar + q + e,   n: 'C5',   d: '8n'  },
+        { off: 4*bar + 2*q,     n: 'Eb5',  d: '4n.' },
+        { off: 4*bar + 3*q + e, n: 'Db5',  d: '8n'  },
+        // Bar 7 — Dbmaj7 (long hold, float out)
+        { off: 5*bar,           n: 'C5',   d: '2n'  },
+        { off: 5*bar + 2*q,     n: 'Ab4',  d: '2n'  },
+      ];
+
+      const melStart = 2 * bar;
+      melNotes.forEach(({ off, n, d }) => mel.triggerAttackRelease(n, d, melStart + off));
+    }
+    main();
+  </script>
+</body>
+</html>
