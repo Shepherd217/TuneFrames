@@ -7,13 +7,7 @@
 </head>
 <body>
   <!-- TuneFrames Metadata -->
-  <div id="tuneframes"
-    data-bpm="124"
-    data-duration="12s"
-    data-genre="house"
-    data-key="F minor"
-    style="display:none">
-  </div>
+  <div id="tuneframes" style="display:none">{"bpm":124,"duration":"12s"}</div>
 
   <script>
     async function main() {
@@ -126,9 +120,6 @@
         piano.triggerAttackRelease(notes, "4n", time);
       });
 
-      // --- START & STOP ---
-      Tone.Transport.start();
-      Tone.Transport.stop("+12");
     }
 
     main();

@@ -7,13 +7,7 @@
 </head>
 <body>
   <!-- TuneFrames Metadata -->
-  <div id="tuneframes"
-    data-bpm="92"
-    data-duration="12s"
-    data-genre="folk"
-    data-key="G major"
-    style="display:none">
-  </div>
+  <div id="tuneframes" style="display:none">{"bpm":92,"duration":"12s"}</div>
 
   <script>
     async function main() {
@@ -26,6 +20,7 @@
 
       // --- GUITAR — triangle pluck, very short decay, near-zero sustain ---
       const guitarVerb = new Tone.Reverb({ decay: 1.4, wet: 0.18 }).connect(masterGain);
+      await guitarVerb.ready;
       const guitarGain = new Tone.Gain(0.65).connect(guitarVerb);
       const guitar = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: "triangle" },
@@ -51,6 +46,7 @@
 
       // --- BRUSHED SNARE — barely there, just rhythm shape ---
       const brushVerb = new Tone.Reverb({ decay: 0.6, wet: 0.3 }).connect(masterGain);
+      await brushVerb.ready;
       const brushGain = new Tone.Gain(0.12).connect(brushVerb);
       const brush = new Tone.NoiseSynth({
         noise: { type: "white" },
@@ -128,9 +124,6 @@
       }, [null,null,null,null,1,null,null,null,null,null,null,null,1,null,null,null], "16n");
       brushSeq.start("2m");
 
-      // --- START & STOP ---
-      Tone.Transport.start();
-      Tone.Transport.stop("+12");
     }
 
     main();

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TuneFrames — Render Retest</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <!-- TuneFrames Metadata -->
+  <div id="tuneframes" style="display:none">{"bpm":120,"duration":"10s"}</div>
+
+  <script>
+    async function main() {
+      await Tone.start();
+
+      // 120 BPM: quarter note = 0.5s, bar = 2.0s, 10s = 5 bars exactly.
+      // All note times are absolute seconds from 0. No Tone.now(), no Transport.start().
+      const beat = 0.5;
+      const bar  = 2.0;
+
+      // --- MASTER BUS ---
+      const limiter    = new Tone.Limiter(-1).toDestination();
+      const masterGain = new Tone.Gain(0.82).connect(limiter);
+
+      // --- REVERB connected to master ---
+      const reverb = new Tone.Reverb({ decay: 2.5, wet: 0.30 }).connect(masterGain);
+
+      // --- DELAY connected to master (parallel with reverb, not chained) ---
+      const delay = new Tone.FeedbackDelay(beat * 0.5, 0.25).connect(masterGain);
+
+      // --- KICK (MembraneSynth) ---
+      const kickGain = new Tone.Gain(0.88).connect(masterGain);
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.06,
+        octaves: 9,
+        envelope: { attack: 0.001, decay: 0.34, sustain: 0, release: 0.1 }
+      }).connect(kickGain);
+
+      // --- HI-HAT (MetalSynth) ---
+      // MetalSynth.triggerAttackRelease(duration, time, velocity) -- no pitch arg
+      const hatGain = new Tone.Gain(0.36).connect(masterGain);
+      const hat = new Tone.MetalSynth({
+        frequency: 440,
+        envelope: { attack: 0.001, decay: 0.05, release: 0.01 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4000,
+        octaves: 1.5
+      }).connect(hatGain);
+
+      // --- CHORDS (PolySynth) through reverb ---
+      const padGain = new Tone.Gain(0.60).connect(reverb);
+      const pad = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.40, decay: 0.5, sustain: 0.60, release: 1.8 },
+        volume: -8
+      }).connect(padGain);
+
+      // --- MELODY (Synth) through delay + reverb ---
+      const melGain = new Tone.Gain(0.72).connect(delay);
+      melGain.connect(reverb);
+      const mel = new Tone.Synth({
+        oscillator: { type: "triangle" },
+        envelope: { attack: 0.012, decay: 0.20, sustain: 0.45, release: 0.65 },
+        volume: -5
+      }).connect(melGain);
+
+      // --- KICK: 4-on-the-floor, every 0.5s, 20 hits, last at 9.5s ---
+      for (let i = 0; i < 20; i++) {
+        kick.triggerAttackRelease("C1", "8n", i * beat);
+      }
+
+      // --- HI-HAT: 8th notes every 0.25s, on-beat louder, 40 hits, last at 9.75s ---
+      for (let i = 0; i < 40; i++) {
+        const vel = (i % 2 === 0) ? 0.60 : 0.35;
+        hat.triggerAttackRelease("16n", i * (beat * 0.5), vel);
+      }
+
+      // --- CHORDS: Dm -> Bb -> F -> C, one bar each, enter at bar 2 (2s) ---
+      // "1n" = whole note = 2.0s at 120 BPM = exactly one bar
+      const progression = [
+        { notes: ["D2","F2","A2"], time: bar       },  // Dm @ 2s
+        { notes: ["Bb2","D3","F3"], time: bar * 2  },  // Bb @ 4s
+        { notes: ["F2","A2","C3"], time: bar * 3   },  // F  @ 6s
+        { notes: ["C3","E3","G3"], time: bar * 4   },  // C  @ 8s
+      ];
+      progression.forEach(({ notes, time }) => {
+        pad.triggerAttackRelease(notes, "1n", time);
+      });
+
+      // --- MELODY: D minor pentatonic, enters at bar 3 (4s), last note at 9.0s ---
+      const melody = [
+        { note: "F4", dur: "4n", t: 4.0 },
+        { note: "E4", dur: "8n", t: 4.5 },
+        { note: "D4", dur: "4n", t: 5.0 },
+        { note: "A4", dur: "4n", t: 5.5 },
+        { note: "G4", dur: "2n", t: 6.0 },
+        { note: "F4", dur: "4n", t: 7.0 },
+        { note: "E4", dur: "8n", t: 7.5 },
+        { note: "D4", dur: "4n", t: 8.0 },
+        { note: "F4", dur: "8n", t: 8.5 },
+        { note: "A4", dur: "4n", t: 9.0 },
+      ];
+      melody.forEach(({ note, dur, t }) => {
+        mel.triggerAttackRelease(note, dur, t);
+      });
+
+      // NOTE: do NOT call Tone.Transport.start() here.
+      // Tone.Offline manages the transport internally.
+    }
+
+    main();
+  </script>
+</body>
+</html>

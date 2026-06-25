@@ -9,8 +9,6 @@
 async function main() {
   await Tone.start();
 
-  Tone.Transport.bpm.value = 80;
-
   const beat = 60 / 80;     // 0.75s per quarter note
   const half = beat * 2;    // 1.5s per half note
 
@@ -57,10 +55,8 @@ async function main() {
   // ─────────────────────────────────────────────────────────────────────────
   // PHRASE 1 (0-6s): Statement — strings introduce D minor melody
   // D minor scale ascending: D E F G A Bb A G
-  // Strings move by step (good voice leading), brass hold tonic
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Strings: 8th-note melodic line in right register
   const phrase1 = [
     { note: 'D4',  t: 0 },
     { note: 'E4',  t: beat * 0.5 },
@@ -71,33 +67,22 @@ async function main() {
     { note: 'A4',  t: beat * 3 },
     { note: 'G4',  t: beat * 3.5 },
   ];
-  phrase1.forEach(({ note, t }) => {
-    Tone.Transport.scheduleOnce((time) => {
-      strings.triggerAttackRelease(note, '4n', time);
-    }, t);
-  });
+  phrase1.forEach(({ note, t }) => strings.triggerAttackRelease(note, '4n', t));
 
-  // Brass: hold tonic Dm (D3 + A3) for first 3 beats, then IV (Gm) for 3 beats
-  Tone.Transport.scheduleOnce((t) => {
-    brass.triggerAttackRelease(['D3', 'F3', 'A3'], half, t);
-  }, 0);
-  Tone.Transport.scheduleOnce((t) => {
-    brass.triggerAttackRelease(['G2', 'Bb2', 'D3'], half, t);
-  }, beat * 3);
+  // Brass: tonic Dm for 3 beats, then IV (Gm)
+  brass.triggerAttackRelease(['D3', 'F3', 'A3'], half, 0);
+  brass.triggerAttackRelease(['G2', 'Bb2', 'D3'], half, beat * 3);
 
-  // Timpani: downbeat on D2 at bar 1 start
-  Tone.Transport.scheduleOnce((t) => {
-    timpani.triggerAttackRelease('D2', '8n', t);
-  }, 0);
+  // Timpani: downbeat on D2
+  timpani.triggerAttackRelease('D2', '8n', 0);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // PHRASE 2 (6-10s): Response — melody rises, woodwinds fill between strings
-  // Half-cadence: ends on A major (the V chord) — tension before resolution
+  // PHRASE 2 (6-10s): Response — melody rises, woodwinds fill
+  // Half-cadence: ends on A major (V chord)
   // ─────────────────────────────────────────────────────────────────────────
 
   const p2start = beat * 8; // 6s
 
-  // Strings: rising line toward climax, now with wider intervals
   const phrase2 = [
     { note: 'F4',  t: p2start },
     { note: 'A4',  t: p2start + beat * 0.5 },
@@ -106,46 +91,29 @@ async function main() {
     { note: 'E5',  t: p2start + beat * 2 },
     { note: 'F5',  t: p2start + beat * 2.5 },
   ];
-  phrase2.forEach(({ note, t }) => {
-    Tone.Transport.scheduleOnce((time) => {
-      strings.triggerAttackRelease(note, '4n', time);
-    }, t);
-  });
+  phrase2.forEach(({ note, t }) => strings.triggerAttackRelease(note, '4n', t));
 
-  // Woodwinds: fill the harmony gaps between string notes
-  // They hold the inner voices (3rd and 5th) that strings don't play
+  // Woodwinds: fill inner voices between string notes
   const woodwindNotes = [
     { note: 'A4', t: p2start + beat * 0.25 },
     { note: 'C5', t: p2start + beat * 1.25 },
     { note: 'F4', t: p2start + beat * 2.25 },
   ];
-  woodwindNotes.forEach(({ note, t }) => {
-    Tone.Transport.scheduleOnce((time) => {
-      woodwinds.triggerAttackRelease(note, '4n', time);
-    }, t);
-  });
+  woodwindNotes.forEach(({ note, t }) => woodwinds.triggerAttackRelease(note, '4n', t));
 
-  // Brass: IV (Bb) → V (A major) — building to the half cadence
-  Tone.Transport.scheduleOnce((t) => {
-    brass.triggerAttackRelease(['Bb2', 'D3', 'F3'], half, t);
-  }, p2start);
-  Tone.Transport.scheduleOnce((t) => {
-    // A major (V in D minor) — the leading chord, needs resolution
-    brass.triggerAttackRelease(['A2', 'C#3', 'E3'], half, t);
-  }, p2start + beat * 3);
+  // Brass: IV (Bb) → V (A major) — half cadence
+  brass.triggerAttackRelease(['Bb2', 'D3', 'F3'], half, p2start);
+  brass.triggerAttackRelease(['A2', 'C#3', 'E3'], half, p2start + beat * 3);
 
-  // Timpani: emphasizes the IV-V shift
-  Tone.Transport.scheduleOnce((t) => timpani.triggerAttackRelease('G2', '8n', t), p2start);
-  Tone.Transport.scheduleOnce((t) => timpani.triggerAttackRelease('A2', '8n', t), p2start + beat * 3);
+  timpani.triggerAttackRelease('G2', '8n', p2start);
+  timpani.triggerAttackRelease('A2', '8n', p2start + beat * 3);
 
   // ─────────────────────────────────────────────────────────────────────────
   // PHRASE 3 (10-14s): Resolution — full cadence I (Dm), all voices converge
-  // V → i: tension resolves back to D minor
   // ─────────────────────────────────────────────────────────────────────────
 
   const p3start = p2start + beat * 6; // ~10.5s
 
-  // Strings: descend from the climax F5 back to D4 (tonic)
   const phrase3 = [
     { note: 'F5',  t: p3start },
     { note: 'E5',  t: p3start + beat * 0.5 },
@@ -156,44 +124,17 @@ async function main() {
     { note: 'D4',  t: p3start + beat * 3 },
   ];
   phrase3.forEach(({ note, t }) => {
-    if (t < 14) {
-      Tone.Transport.scheduleOnce((time) => {
-        strings.triggerAttackRelease(note, '4n', time);
-      }, t);
-    }
+    if (t < 14) strings.triggerAttackRelease(note, '4n', t);
   });
 
-  // Brass: full Dm chord — resolution, all voices present
-  Tone.Transport.scheduleOnce((t) => {
-    brass.triggerAttackRelease(['D3', 'F3', 'A3', 'D4'], beat * 4, t);
-  }, p3start);
+  // Brass: full Dm resolution chord
+  brass.triggerAttackRelease(['D3', 'F3', 'A3', 'D4'], beat * 4, p3start);
 
-  // Woodwinds: hold the 5th (A) above the brass — completes the voicing
-  Tone.Transport.scheduleOnce((t) => {
-    woodwinds.triggerAttackRelease('F5', beat * 3, t);
-  }, p3start);
+  // Woodwinds: hold the 5th above brass
+  woodwinds.triggerAttackRelease('F5', beat * 3, p3start);
 
-  // Timpani: strong roll on D2 — the final downbeat
-  Tone.Transport.scheduleOnce((t) => timpani.triggerAttackRelease('D2', '4n', t), p3start);
-  Tone.Transport.scheduleOnce((t) => timpani.triggerAttackRelease('D2', '4n', t), p3start + beat * 3);
-
-  Tone.Transport.start();
+  // Timpani: final downbeats on D2
+  timpani.triggerAttackRelease('D2', '4n', p3start);
+  timpani.triggerAttackRelease('D2', '4n', p3start + beat * 3);
 }
-
-window.renderComposition = async function(wavPath) {
-  let attempts = 0;
-  while (typeof Tone === 'undefined' && attempts < 50) {
-    await new Promise(r => setTimeout(r, 100));
-    attempts++;
-  }
-  if (typeof Tone === 'undefined') throw new Error('Tone not loaded');
-
-  const meta = JSON.parse(document.getElementById('tuneframes').textContent);
-  const durationSec = parseFloat(meta.duration) + 2.0;
-
-  const buffer = await Tone.Offline(async () => { await main(); }, durationSec, 1, 44100);
-  const wav = audioBufferToWav(buffer);
-  window.writeFile(wavPath, Array.from(new Uint8Array(wav)));
-  return wav.byteLength;
-};
 </script>

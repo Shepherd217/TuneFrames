@@ -68,9 +68,6 @@
       brass.volume.value = -10;
 
       // Stabs enter on bar 2 — same upbeat timing as guitar chank
-      const stabTimes = [s16 * 9, s16 * 13, s16 * 9 + bar, s16 * 13 + bar];
-      stabTimes.forEach(t => brass.triggerAttackRelease(['E4','G4','B4'], '16n', bar + t - bar));
-
       for (let rep = 1; rep < 5; rep++) {
         [s16 * 9, s16 * 13].forEach(t => {
           brass.triggerAttackRelease(['E4','G4','B4'], '16n', rep * bar + t);
@@ -126,7 +123,6 @@
       // Full 16th grid, slight accent on quarter notes
       for (let rep = 0; rep < 5; rep++) {
         for (let i = 0; i < 16; i++) {
-          hat.volume.value = (i % 4 === 0) ? -15 : -21; // accent on beats
           hat.triggerAttackRelease('32n', rep * bar + i * s16);
         }
       }

@@ -7,13 +7,7 @@
 </head>
 <body>
   <!-- TuneFrames Metadata -->
-  <div id="tuneframes"
-    data-bpm="128"
-    data-duration="12s"
-    data-genre="indie-pop"
-    data-key="G major"
-    style="display:none">
-  </div>
+  <div id="tuneframes" style="display:none">{"bpm":128,"duration":"12s"}</div>
 
   <script>
     async function main() {
@@ -119,9 +113,6 @@
       }, [1,null,1,null,1,null,1,null,1,null,1,null,1,null,1,null], "16n");
       hatSeq.start(0);
 
-      // --- START & STOP ---
-      Tone.Transport.start();
-      Tone.Transport.stop("+12");
     }
 
     main();

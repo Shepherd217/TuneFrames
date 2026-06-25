@@ -7,13 +7,7 @@
 </head>
 <body>
   <!-- TuneFrames Metadata -->
-  <div id="tuneframes"
-    data-bpm="136"
-    data-duration="12s"
-    data-genre="techno"
-    data-key="A minor"
-    style="display:none">
-  </div>
+  <div id="tuneframes" style="display:none">{"bpm":136,"duration":"12s"}</div>
 
   <script>
     async function main() {
@@ -123,9 +117,6 @@
       bassFilter.frequency.linearRampToValueAtTime(150, sweepStart + 4.5);
       bassFilter.frequency.linearRampToValueAtTime(1800, sweepStart + 8);
 
-      // --- START & STOP ---
-      Tone.Transport.start();
-      Tone.Transport.stop("+12");
     }
 
     main();

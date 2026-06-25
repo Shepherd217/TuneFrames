@@ -6,46 +6,45 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 </head>
 <body>
-  <!-- TuneFrames Metadata -->
-  <div id="tuneframes"
-    data-bpm="88"
-    data-duration="12s"
-    data-genre="hip-hop"
-    data-key="F minor"
-    style="display:none">
-  </div>
+  <!-- TuneFrames Metadata — must be JSON textContent, not data attributes -->
+  <div id="tuneframes" style="display:none">{"bpm":88,"duration":"12s"}</div>
 
   <script>
     async function main() {
       await Tone.start();
+
+      // Set BPM so Tone.Time string values resolve correctly
       Tone.Transport.bpm.value = 88;
-      Tone.Transport.swing = 0.5;
-      Tone.Transport.swingSubdivision = "16n";
+
+      const beat = Tone.Time("4n").toSeconds(); // ~0.682s at 88 BPM
+      const s16  = beat / 4;                    // 16th note ~0.170s
+      const bar  = beat * 4;                    // 1 bar ~2.727s
+      const numBars = 4;                        // 4 bars ~10.9s (fits in 12s)
 
       // --- MASTER BUS ---
       const masterLimiter = new Tone.Limiter(-1).toDestination();
-      const masterGain = new Tone.Gain(0.82).connect(masterLimiter);
+      const masterGain    = new Tone.Gain(0.82).connect(masterLimiter);
 
-      // --- KICK — punchy MembraneSynth with slight saturation ---
+      // --- KICK — punchy MembraneSynth ---
       const kickDist = new Tone.Distortion({ distortion: 0.2, wet: 0.4 }).connect(masterGain);
       const kickGain = new Tone.Gain(0.88).connect(kickDist);
-      const kick = new Tone.MembraneSynth({
+      const kick     = new Tone.MembraneSynth({
         pitchDecay: 0.07,
         octaves: 6,
         envelope: { attack: 0.001, decay: 0.32, sustain: 0, release: 0.1 }
       }).connect(kickGain);
 
-      // --- SNARE — white noise with long reverb tail (the "room" sound) ---
+      // --- SNARE — white noise with reverb tail ---
       const snareVerb = new Tone.Reverb({ decay: 1.8, wet: 0.5 }).connect(masterGain);
       const snareGain = new Tone.Gain(0.52).connect(snareVerb);
-      const snare = new Tone.NoiseSynth({
+      const snare     = new Tone.NoiseSynth({
         noise: { type: "white" },
         envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.06 }
       }).connect(snareGain);
 
       // --- HI-HAT — MetalSynth, short and crisp ---
       const hatGain = new Tone.Gain(0.28).connect(masterGain);
-      const hat = new Tone.MetalSynth({
+      const hat     = new Tone.MetalSynth({
         frequency: 500,
         envelope: { attack: 0.001, decay: 0.04, release: 0.01 },
         harmonicity: 5.1,
@@ -54,86 +53,74 @@
         octaves: 1.2
       }).connect(hatGain);
 
-      // --- BASS — MonoSynth, smooth with filter envelope ---
+      // --- BASS — MonoSynth with filter envelope ---
       const bassGain = new Tone.Gain(0.7).connect(masterGain);
-      const bass = new Tone.MonoSynth({
+      const bass     = new Tone.MonoSynth({
         oscillator: { type: "sawtooth" },
         filter: { Q: 2, type: "lowpass", rolloff: -12 },
         filterEnvelope: {
           attack: 0.01, decay: 0.2, sustain: 0.4, release: 0.3,
           baseFrequency: 120, octaves: 1.5
         },
-        envelope: { attack: 0.01, decay: 0.15, sustain: 0.7, release: 0.3 },
-        volume: -2
+        envelope: { attack: 0.01, decay: 0.15, sustain: 0.7, release: 0.3 }
       }).connect(bassGain);
 
-      // --- SOUL PAD — warm PolySynth, slow attack = reverse-sample texture ---
+      // --- SOUL PAD — warm PolySynth, slow attack ---
       const padVerb = new Tone.Reverb({ decay: 3.5, wet: 0.5 }).connect(masterGain);
       const padGain = new Tone.Gain(0.35).connect(padVerb);
-      const pad = new Tone.PolySynth(Tone.Synth, {
+      const pad     = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: "triangle" },
-        envelope: { attack: 0.6, decay: 0.5, sustain: 0.7, release: 2.0 },
-        volume: 0
+        envelope: { attack: 0.6, decay: 0.5, sustain: 0.7, release: 2.0 }
       }).connect(padGain);
 
       // --- KICK PATTERN — beat 1, "and" of 2, beat 3 (classic boom bap) ---
-      const kickSeq = new Tone.Sequence((time, val) => {
-        if (val) kick.triggerAttackRelease("C1", "8n", time);
-      }, ["C1",null,null,null,null,null,"C1",null,"C1",null,null,null,null,null,null,null], "16n");
-      kickSeq.start(0);
+      // 16-step grid: positions 0, 6, 8
+      for (let b = 0; b < numBars; b++) {
+        [0, 6, 8].forEach(step => {
+          kick.triggerAttackRelease("C1", beat * 0.5, b * bar + step * s16);
+        });
+      }
 
-      // --- SNARE — strictly beats 2 and 4 ---
-      const snareSeq = new Tone.Sequence((time, val) => {
-        if (val) snare.triggerAttackRelease("8n", time);
-      }, [null,null,null,null,1,null,null,null,null,null,null,null,1,null,null,null], "16n");
-      snareSeq.start(0);
+      // --- SNARE — strictly beats 2 and 4 (steps 4 and 12) ---
+      for (let b = 0; b < numBars; b++) {
+        [4, 12].forEach(step => {
+          snare.triggerAttackRelease(beat * 0.5, b * bar + step * s16);
+        });
+      }
 
-      // --- HI-HAT — all 16ths, swing does the shuffle; velocity variation adds humanity ---
+      // --- HI-HAT — all 16 steps per bar, velocity variation adds humanity ---
       const hatVels = [0.9,0.45,0.85,0.4,0.9,0.45,0.85,0.4,0.9,0.45,0.9,0.4,0.85,0.45,0.9,0.45];
-      let hatStep = 0;
-      const hatSeq = new Tone.Sequence((time) => {
-        hat.triggerAttackRelease("16n", time, hatVels[hatStep % 16]);
-        hatStep++;
-      }, new Array(16).fill(1), "16n");
-      hatSeq.start(0);
+      for (let b = 0; b < numBars; b++) {
+        for (let s = 0; s < 16; s++) {
+          hat.triggerAttackRelease(s16 * 0.8, b * bar + s * s16, hatVels[s]);
+        }
+      }
 
-      // --- BASS LINE — smooth Fm vamp: F1 C2 Eb2 Bb1 with movement ---
-      const bassNotes = [
-        { time: "0:0:0", note: "F1", dur: "4n" },
-        { time: "0:1:0", note: "F1", dur: "8n" },
-        { time: "0:1:2", note: "C2", dur: "8n" },
-        { time: "0:2:0", note: "Eb2", dur: "8n" },
-        { time: "0:2:2", note: "D2",  dur: "8n" },
-        { time: "0:3:0", note: "C2",  dur: "4n" },
-
-        { time: "1:0:0", note: "Bb1", dur: "4n" },
-        { time: "1:1:0", note: "Bb1", dur: "8n" },
-        { time: "1:1:2", note: "F1",  dur: "8n" },
-        { time: "1:2:0", note: "Ab1", dur: "8n" },
-        { time: "1:2:2", note: "G1",  dur: "8n" },
-        { time: "1:3:0", note: "F1",  dur: "4n" },
+      // --- BASS LINE — Fm vamp: 2-bar phrase played twice ---
+      // phrase repeats at bars 0-1 and bars 2-3
+      const bassPhrase = [
+        { step: 0,  note: "F1",  dur: beat },
+        { step: 4,  note: "F1",  dur: beat * 0.5 },
+        { step: 6,  note: "C2",  dur: beat * 0.5 },
+        { step: 8,  note: "Eb2", dur: beat * 0.5 },
+        { step: 10, note: "D2",  dur: beat * 0.5 },
+        { step: 12, note: "C2",  dur: beat },
+        { step: 16, note: "Bb1", dur: beat },
+        { step: 20, note: "Bb1", dur: beat * 0.5 },
+        { step: 22, note: "F1",  dur: beat * 0.5 },
+        { step: 24, note: "Ab1", dur: beat * 0.5 },
+        { step: 26, note: "G1",  dur: beat * 0.5 },
+        { step: 28, note: "F1",  dur: beat },
       ];
-      const bassPart = new Tone.Part((time, val) => {
-        bass.triggerAttackRelease(val.note, val.dur, time);
-      }, bassNotes.map(({ time, note, dur }) => [time, { note, dur }]));
-      bassPart.loopEnd = "2m";
-      bassPart.loop = true;
-      bassPart.start("2m"); // bass enters bar 3
+      for (let phrase = 0; phrase < 2; phrase++) {
+        bassPhrase.forEach(({ step, note, dur }) => {
+          bass.triggerAttackRelease(note, dur, phrase * 2 * bar + step * s16);
+        });
+      }
 
-      // --- SOUL PAD — Fm7 chord, slow attack, enters bar 3 ---
-      // Fm7: F Ab C Eb — warm and dusty
-      const padEvents = [
-        { time: "2m",  notes: ["F3","Ab3","C4","Eb4"] },
-        { time: "4m",  notes: ["Bb2","Db3","F3","Ab3"] }, // Bbm7
-        { time: "6m",  notes: ["F3","Ab3","C4","Eb4"] },  // back to Fm7
-      ];
-      padEvents.forEach(({ time, notes }) => {
-        pad.triggerAttackRelease(notes, "2m", time);
-      });
-
-      // --- START & STOP ---
-      Tone.Transport.start();
-      Tone.Transport.stop("+12");
+      // --- SOUL PAD — Fm7 bars 0-1, Bbm7 bars 2-3 ---
+      pad.triggerAttackRelease(["F3","Ab3","C4","Eb4"],  bar * 2, 0);
+      pad.triggerAttackRelease(["Bb2","Db3","F3","Ab3"], bar * 2, bar * 2);
     }
 
     main();

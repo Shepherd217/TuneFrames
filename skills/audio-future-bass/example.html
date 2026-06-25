@@ -7,13 +7,7 @@
 </head>
 <body>
   <!-- TuneFrames Metadata -->
-  <div id="tuneframes"
-    data-bpm="150"
-    data-duration="12s"
-    data-genre="future-bass"
-    data-key="A minor"
-    style="display:none">
-  </div>
+  <div id="tuneframes" style="display:none">{"bpm":150,"duration":"12s"}</div>
 
   <script>
     async function main() {
@@ -162,9 +156,6 @@
       }, new Array(16).fill(1), "16n");
       hatSeq.start(0);
 
-      // --- START & STOP ---
-      Tone.Transport.start();
-      Tone.Transport.stop("+12");
     }
 
     main();

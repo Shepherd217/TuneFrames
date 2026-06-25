@@ -7,13 +7,7 @@
 </head>
 <body>
   <!-- TuneFrames Metadata -->
-  <div id="tuneframes"
-    data-bpm="165"
-    data-duration="12s"
-    data-genre="boss-battle"
-    data-key="D minor"
-    style="display:none">
-  </div>
+  <div id="tuneframes" style="display:none">{"bpm":165,"duration":"12s","genre":"boss-battle","key":"D minor"}</div>
 
   <script>
     async function main() {
@@ -182,9 +176,6 @@
         brass.triggerAttackRelease(note, dur, time);
       });
 
-      // --- START & STOP ---
-      Tone.Transport.start();
-      Tone.Transport.stop("+12");
     }
 
     main();

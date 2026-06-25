@@ -75,35 +75,13 @@ async function main() {
     'G4','B4','D5','G5',
   ];
 
-  arpNotes.forEach((note, i) => {
-    Tone.Transport.scheduleOnce((t) => {
-      arp.triggerAttackRelease(note, '16n', t);
-    }, i * sixteenth);
-  });
-
-  // Second pass — repeat the arp from 2.45s
-  const loopStart = arpNotes.length * sixteenth;
-  arpNotes.forEach((note, i) => {
-    Tone.Transport.scheduleOnce((t) => {
-      arp.triggerAttackRelease(note, '16n', t);
-    }, loopStart + i * sixteenth);
-  });
-
-  // Third pass from 4.9s
-  const loopStart2 = loopStart * 2;
-  arpNotes.forEach((note, i) => {
-    Tone.Transport.scheduleOnce((t) => {
-      arp.triggerAttackRelease(note, '16n', t);
-    }, loopStart2 + i * sixteenth);
-  });
-
-  // Fourth pass
-  const loopStart3 = loopStart * 3;
-  arpNotes.forEach((note, i) => {
-    Tone.Transport.scheduleOnce((t) => {
-      arp.triggerAttackRelease(note, '16n', t);
-    }, loopStart3 + i * sixteenth);
-  });
+  // Four passes of the 16-note arpeggio
+  for (let pass = 0; pass < 4; pass++) {
+    const passStart = pass * arpNotes.length * sixteenth;
+    arpNotes.forEach((note, i) => {
+      arp.triggerAttackRelease(note, '16n', passStart + i * sixteenth);
+    });
+  }
 
   // ── Pad chords — one per bar (Am, F, C, G, repeating) ────────────────────
   const beat = 60 / 98;
@@ -114,9 +92,7 @@ async function main() {
     { notes: ['G2','B2','D3'], t: 0.8 + beat * 12 },
   ];
   padChords.forEach(({ notes, t }) => {
-    Tone.Transport.scheduleOnce((time) => {
-      pad.triggerAttackRelease(notes, '2n', time);
-    }, t);
+    pad.triggerAttackRelease(notes, '2n', t);
   });
 
   // ── Drums — enter at 2s ───────────────────────────────────────────────────
@@ -126,7 +102,7 @@ async function main() {
   for (let i = 0; i < 10; i++) {
     const t = drumStart + i * beat;
     if (t < 12) {
-      Tone.Transport.scheduleOnce((time) => kick.triggerAttackRelease('C1', '8n', time), t);
+      kick.triggerAttackRelease('C1', '8n', t);
     }
   }
 
@@ -134,7 +110,7 @@ async function main() {
   for (let i = 0; i < 40; i++) {
     const t = drumStart + i * sixteenth;
     if (t < 12) {
-      Tone.Transport.scheduleOnce((time) => hihat.triggerAttackRelease('16n', time), t);
+      hihat.triggerAttackRelease('16n', t);
     }
   }
 
@@ -143,12 +119,10 @@ async function main() {
     [beat, beat * 3].forEach((offset) => {
       const t = drumStart + bar * beat * 4 + offset;
       if (t < 12) {
-        Tone.Transport.scheduleOnce((time) => clap.triggerAttackRelease('8n', time), t);
+        clap.triggerAttackRelease('8n', t);
       }
     });
   }
-
-  Tone.Transport.start();
 }
 
 window.renderComposition = async function(wavPath) {

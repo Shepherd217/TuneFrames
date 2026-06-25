@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>TuneFrames — Verify</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":120,"duration":"10s"}</div>
+  <script>
+// Verify — upbeat electronic, C major, I-vi-IV-V-I arc. "System checked out: PASS."
+//
+// Instrument choices follow confirmed-working pattern (techno/lofi examples):
+//   - Tone.Reverb without await  — generate() resolves before startRendering() inside Offline
+//   - Tone.MembraneSynth kick    — confirmed working in example-techno.html
+//   - Tone.NoiseSynth hi-hat     — confirmed working; MetalSynth fails inside Tone.Offline
+//     (MetalSynth's FM oscillators use sustain:0 early-stop scheduling which creates
+//      a state-timeline ordering conflict on re-trigger in the Offline context)
+//   - main() NOT called from HTML — render.js calls it inside Tone.Offline()
+
+async function main() {
+  await Tone.start();
+
+  const beat = Tone.Time('4n').toSeconds();  // 0.5s at 120 BPM
+  const bar  = beat * 4;                     // 2.0s
+
+  // Effects
+  const reverb = new Tone.Reverb({ decay: 2.2, wet: 0.28 }).toDestination();
+  const delay  = new Tone.FeedbackDelay({ delayTime: beat, feedback: 0.28, wet: 0.22 }).toDestination();
+
+  // Chord pad — PolySynth(Synth) → reverb
+  const pad = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.08, decay: 0.40, sustain: 0.60, release: 1.20 }
+  }).connect(reverb);
+  pad.volume.value = -10;
+
+  // Melody — Synth → delay
+  const mel = new Tone.Synth({
+    oscillator: { type: 'sawtooth' },
+    envelope: { attack: 0.01, decay: 0.15, sustain: 0.40, release: 0.30 }
+  }).connect(delay);
+  mel.volume.value = -9;
+
+  // Kick — MembraneSynth
+  const kick = new Tone.MembraneSynth({
+    pitchDecay: 0.05,
+    octaves: 6,
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.001, decay: 0.28, sustain: 0, release: 0.08 }
+  }).toDestination();
+  kick.volume.value = -5;
+
+  // Hi-hat — NoiseSynth (white noise burst, similar timbre to metallic hat)
+  // NoiseSynth works inside Tone.Offline; MetalSynth does not in v14.8.49
+  const hihat = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.01 }
+  }).toDestination();
+  hihat.volume.value = -16;
+
+  // Kick: 4-on-the-floor, 20 hits across 10s
+  for (var i = 0; i < 20; i++) {
+    kick.triggerAttackRelease('C1', '8n', i * beat);
+  }
+
+  // Hi-hat: off-beat 8th notes, 19 hits
+  for (var j = 0; j < 19; j++) {
+    var vel = j % 2 === 0 ? 0.60 : 0.32;
+    hihat.triggerAttackRelease('16n', beat * 0.5 + j * beat, vel);
+  }
+
+  // Chords: I-vi-IV-V-I (C-Am-F-G-C), one per bar
+  [
+    { notes: ['C4', 'E4', 'G4'], t: bar * 0 },
+    { notes: ['A3', 'C4', 'E4'], t: bar * 1 },
+    { notes: ['F3', 'A3', 'C4'], t: bar * 2 },
+    { notes: ['G3', 'B3', 'D4'], t: bar * 3 },
+    { notes: ['C4', 'E4', 'G4'], t: bar * 4 },
+  ].forEach(function(c) {
+    pad.triggerAttackRelease(c.notes, '1n', c.t);
+  });
+
+  // Melody: question phrase (bars 2-3), answer resolves to tonic (bars 4-5)
+  var e = beat * 0.5;  // eighth-note duration
+  [
+    [bar + beat * 0, 'E5', e],
+    [bar + beat * 1, 'G5', e],
+    [bar + beat * 2, 'A5', beat],
+    [bar * 2 + beat * 0, 'G5', e],
+    [bar * 2 + beat * 1, 'F5', e],
+    [bar * 2 + beat * 2, 'E5', beat],
+    [bar * 3 + beat * 0, 'D5', e],
+    [bar * 3 + beat * 1, 'E5', e],
+    [bar * 3 + beat * 2, 'F5', e],
+    [bar * 3 + beat * 3, 'G5', e],
+    [bar * 4, 'C5', beat * 3],
+  ].forEach(function(n) {
+    mel.triggerAttackRelease(n[1], n[2], n[0]);
+  });
+}
+  </script>
+</body>
+</html>

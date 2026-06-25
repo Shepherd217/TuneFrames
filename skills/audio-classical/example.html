@@ -12,9 +12,9 @@ async function main() {
 
   Tone.Transport.bpm.value = 104;
 
-  const beat    = 60 / 104;       // 0.577s per quarter note
-  const eighth  = beat / 2;       // 0.288s per eighth note
-  const sixteenth = beat / 4;     // 0.144s per sixteenth note
+  const beat      = 60 / 104;      // 0.577s per quarter note
+  const eighth    = beat / 2;      // 0.288s per eighth note
+  const sixteenth = beat / 4;      // 0.144s per sixteenth note
 
   // ── Small room reverb — a piano in a parlour, not a concert hall ──────────
   const reverb = new Tone.Reverb({ decay: 1.1, preDelay: 0.008, wet: 0.22 });
@@ -46,24 +46,19 @@ async function main() {
   lhChord.connect(reverb);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Helper: schedule an Alberti bass pattern for one bar
+  // Helper: schedule an Alberti bass pattern for one bar using direct time
   // root = bass note (e.g. 'C3'), inner = e.g. 'E3', upper = e.g. 'G3'
   // Pattern of 8 eighth notes: root upper inner upper root upper inner upper
   // ─────────────────────────────────────────────────────────────────────────
   function alberti(root, inner, upper, startTime) {
-    // 8 eighth notes per bar: alternating root / chord tones
     const pattern = [root, upper, inner, upper, root, upper, inner, upper];
     pattern.forEach((note, i) => {
       const t = startTime + i * eighth;
-      Tone.Transport.scheduleOnce((time) => {
-        if (i % 2 === 0) {
-          // Bass note — use lhBass (single note, more resonant)
-          lhBass.triggerAttackRelease(note, '8n', time);
-        } else {
-          // Inner/upper chord tone — use lhChord
-          lhChord.triggerAttackRelease(note, '8n', time);
-        }
-      }, t);
+      if (i % 2 === 0) {
+        lhBass.triggerAttackRelease(note, '8n', t);
+      } else {
+        lhChord.triggerAttackRelease(note, '8n', t);
+      }
     });
   }
 
@@ -107,14 +102,13 @@ async function main() {
     { note: 'E5',  dur: '4n',  t: barLen + beat * 3 },
   ];
 
-  // Phrase 2: ornamental turn on E5 (E F E D E), then descent
-  // A "turn" = upper neighbour → main note → lower neighbour → main note
+  // Phrase 2: ornamental turn on E5 (F E D E), then descent
   const turnStart = barLen * 2;
   const turn = [
-    { note: 'F5',  dur: 'n16', t: turnStart },              // upper neighbour
-    { note: 'E5',  dur: 'n16', t: turnStart + sixteenth },  // main
-    { note: 'D5',  dur: 'n16', t: turnStart + sixteenth * 2 }, // lower
-    { note: 'E5',  dur: '8n',  t: turnStart + sixteenth * 3 }, // resolve to main
+    { note: 'F5',  dur: '16n', t: turnStart },
+    { note: 'E5',  dur: '16n', t: turnStart + sixteenth },
+    { note: 'D5',  dur: '16n', t: turnStart + sixteenth * 2 },
+    { note: 'E5',  dur: '8n',  t: turnStart + sixteenth * 3 },
   ];
   const phrase2 = [
     ...turn,
@@ -138,35 +132,14 @@ async function main() {
     // Bar 6: resolution to I — long final note
     { note: 'E5',  dur: '8n',  t: barLen * 5 },
     { note: 'D5',  dur: '8n',  t: barLen * 5 + eighth },
-    { note: 'C5',  dur: '2n',  t: barLen * 5 + beat },   // lands on C5 — tonic, resolved
+    { note: 'C5',  dur: '2n',  t: barLen * 5 + beat },
   ];
 
-  // Schedule all right hand notes
+  // Schedule all right hand notes using direct time offsets (seconds)
   [...phrase1, ...phrase2, ...phrase3].forEach(({ note, dur, t }) => {
     if (t < 12) {
-      Tone.Transport.scheduleOnce((time) => {
-        rh.triggerAttackRelease(note, dur === 'n16' ? '16n' : dur, time);
-      }, t);
+      rh.triggerAttackRelease(note, dur, t);
     }
   });
-
-  Tone.Transport.start();
 }
-
-window.renderComposition = async function(wavPath) {
-  let attempts = 0;
-  while (typeof Tone === 'undefined' && attempts < 50) {
-    await new Promise(r => setTimeout(r, 100));
-    attempts++;
-  }
-  if (typeof Tone === 'undefined') throw new Error('Tone not loaded');
-
-  const meta = JSON.parse(document.getElementById('tuneframes').textContent);
-  const durationSec = parseFloat(meta.duration) + 2.0;
-
-  const buffer = await Tone.Offline(async () => { await main(); }, durationSec, 1, 44100);
-  const wav = audioBufferToWav(buffer);
-  window.writeFile(wavPath, Array.from(new Uint8Array(wav)));
-  return wav.byteLength;
-};
 </script>

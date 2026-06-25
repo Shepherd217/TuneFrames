@@ -18,7 +18,7 @@
 
       // ── Signal chain: everything → comp → destination ────────────────────
       const comp   = new Tone.Compressor({ threshold: -20, ratio: 3, attack: 0.008, release: 0.18 }).toDestination();
-      const reverb = new Tone.Reverb({ decay: 2.8, preDelay: 0.01, wet: 0.38 }).connect(comp);
+      const reverb = new Tone.Freeverb({ roomSize: 0.72, dampening: 3500, wet: 0.38 }).connect(comp);
 
       // ── Pad underneath (barely audible warmth) ───────────────────────────
       const pad = new Tone.PolySynth(Tone.Synth, {

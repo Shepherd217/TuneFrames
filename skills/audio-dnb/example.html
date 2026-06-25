@@ -7,13 +7,7 @@
 </head>
 <body>
   <!-- TuneFrames Metadata -->
-  <div id="tuneframes"
-    data-bpm="174"
-    data-duration="12s"
-    data-genre="dnb"
-    data-key="D minor"
-    style="display:none">
-  </div>
+  <div id="tuneframes" style="display:none">{"bpm":174,"duration":"12s"}</div>
 
   <script>
     async function main() {
@@ -122,9 +116,6 @@
       pad.triggerAttackRelease(padNotes, "4m", "3m");
       pad.triggerAttackRelease(["C3", "Eb3", "G3", "Bb3"], "4m", "7m"); // Cm7
 
-      // --- START & STOP ---
-      Tone.Transport.start();
-      Tone.Transport.stop("+12");
     }
 
     main();

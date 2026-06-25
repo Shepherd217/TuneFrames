@@ -15,8 +15,12 @@
       const q   = Tone.Time('4n').toSeconds(); // ~0.83s per beat
 
       // ── Reverb halls ─────────────────────────────────────────────────────
-      const hall  = new Tone.Reverb({ decay: 7, preDelay: 0.06, wet: 0.65 }).toDestination();
-      const room  = new Tone.Reverb({ decay: 3, preDelay: 0.01, wet: 0.35 }).toDestination();
+      const hall  = new Tone.Reverb({ decay: 7, preDelay: 0.06, wet: 0.65 });
+      const room  = new Tone.Reverb({ decay: 3, preDelay: 0.01, wet: 0.35 });
+      // Await IR generation before offline rendering begins — required in Tone.Offline
+      await Promise.all([hall.ready, room.ready]);
+      hall.toDestination();
+      room.toDestination();
 
       // ── Choir pad (enters immediately, very soft) ─────────────────────────
       const choir = new Tone.PolySynth(Tone.Synth, {

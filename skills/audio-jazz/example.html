@@ -13,6 +13,7 @@
 
       // ── Effects ─────────────────────────────────────────────────────────
       const reverb = new Tone.Reverb({ decay: 1.6, preDelay: 0.01, wet: 0.28 }).toDestination();
+      await reverb.ready;
 
       // ── Piano — shell voicings (3rd + 7th on top) ───────────────────────
       const piano = new Tone.PolySynth(Tone.Synth, {

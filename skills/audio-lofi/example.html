@@ -13,6 +13,7 @@
 
       // ── Effects chain ───────────────────────────────────────────────────
       const reverb   = new Tone.Reverb({ decay: 3.5, preDelay: 0.01, wet: 0.55 }).toDestination();
+      await reverb.ready;
       const lpFilter = new Tone.Filter(1800, 'lowpass').connect(reverb);
       const tape     = new Tone.Distortion(0.04).connect(lpFilter);
 

@@ -44,51 +44,54 @@ async function main() {
 
   // ── Schedule drone tones — D minor: D F A C ───────────────────────────────
   // Staggered so they don't all attack at once — the overlapping sustains
-  // create the "chord cloud" that defines ambient music
+  // create the "chord cloud" that defines ambient music.
+  // Note durations use seconds (6, 5, etc.) so the 4.5–6s attacks can fully
+  // develop before release. '8n' (0.5s at 60 BPM) is far too short.
 
-  // Root drone: D2 enters immediately, fades in over 4.5 seconds
+  // Root drone: enters immediately, fades in over 4.5 seconds
   Tone.Transport.scheduleOnce((t) => {
-    drone.triggerAttackRelease(['D3', 'A3'], '8n', t);
+    drone.triggerAttackRelease(['D3', 'A3'], 6, t);
   }, 0);
 
   // Fifth enters at 1.5s — builds on the drone
   Tone.Transport.scheduleOnce((t) => {
-    drone.triggerAttackRelease(['F3', 'C4'], '8n', t);
+    drone.triggerAttackRelease(['F3', 'C4'], 6, t);
   }, 1.5);
 
   // Color tone — minor 7th adds bittersweet quality
   Tone.Transport.scheduleOnce((t) => {
-    drone.triggerAttackRelease(['E3', 'G3'], '8n', t);
+    drone.triggerAttackRelease(['E3', 'G3'], 5, t);
   }, 3.5);
 
   // Second wave — new chord cloud begins overlapping the first
   Tone.Transport.scheduleOnce((t) => {
-    drone.triggerAttackRelease(['D3', 'F3'], '8n', t);
+    drone.triggerAttackRelease(['D3', 'F3'], 5, t);
   }, 6.0);
 
   Tone.Transport.scheduleOnce((t) => {
-    drone.triggerAttackRelease(['A3', 'C4'], '8n', t);
+    drone.triggerAttackRelease(['A3', 'C4'], 4, t);
   }, 8.0);
 
   // ── Shimmer tones — upper harmonics ───────────────────────────────────────
   Tone.Transport.scheduleOnce((t) => {
-    shimmer.triggerAttackRelease(['F5', 'A5'], '8n', t);
+    shimmer.triggerAttackRelease(['F5', 'A5'], 5, t);
   }, 2.0);
 
   Tone.Transport.scheduleOnce((t) => {
-    shimmer.triggerAttackRelease(['D5', 'C5'], '8n', t);
+    shimmer.triggerAttackRelease(['D5', 'C5'], 5, t);
   }, 5.5);
 
   Tone.Transport.scheduleOnce((t) => {
-    shimmer.triggerAttackRelease(['E5', 'G5'], '8n', t);
+    shimmer.triggerAttackRelease(['E5', 'G5'], 4, t);
   }, 9.0);
 
   // ── Sub bass — single low D, fades in and holds ───────────────────────────
   Tone.Transport.scheduleOnce((t) => {
-    sub.triggerAttackRelease('D2', '8n', t);
+    sub.triggerAttackRelease('D2', 7, t);
   }, 0.5);
 
-  Tone.Transport.start();
+  // NOTE: do NOT call Tone.Transport.start() here — Tone.Offline manages
+  // transport internally. Calling it manually breaks offline rendering.
 }
 
 window.renderComposition = async function(wavPath) {

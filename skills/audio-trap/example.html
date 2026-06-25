@@ -7,13 +7,7 @@
 </head>
 <body>
   <!-- TuneFrames Metadata -->
-  <div id="tuneframes"
-    data-bpm="140"
-    data-duration="12s"
-    data-genre="trap"
-    data-key="C minor"
-    style="display:none">
-  </div>
+  <div id="tuneframes" style="display:none">{"bpm":140,"duration":"12s"}</div>
 
   <script>
     async function main() {
@@ -117,9 +111,6 @@
       strings.triggerAttackRelease(["Ab2", "C3", "Eb3", "G3"], "2m", "4m");
       strings.triggerAttackRelease(["C3", "Eb3", "G3", "Bb3"], "2m", "6m");
 
-      // --- START & STOP ---
-      Tone.Transport.start();
-      Tone.Transport.stop("+12");
     }
 
     main();
