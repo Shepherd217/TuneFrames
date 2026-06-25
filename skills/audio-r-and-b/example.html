@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — R&amp;B / Neo-Soul</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":86,"duration":"12s"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 86;
+
+      const bar = Tone.Time('1n').toSeconds(); // ~2.79s
+      const q   = Tone.Time('4n').toSeconds(); // ~0.698s
+      const s8  = Tone.Time('8n').toSeconds(); // ~0.349s
+      const s16 = Tone.Time('16n').toSeconds();
+
+      // ── Signal chain: everything → comp → destination ────────────────────
+      const comp   = new Tone.Compressor({ threshold: -20, ratio: 3, attack: 0.008, release: 0.18 }).toDestination();
+      const reverb = new Tone.Reverb({ decay: 2.8, preDelay: 0.01, wet: 0.38 }).connect(comp);
+
+      // ── Pad underneath (barely audible warmth) ───────────────────────────
+      const pad = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sine' },
+        envelope: { attack: 2.2, decay: 0.5, sustain: 0.85, release: 5.0 }
+      }).connect(reverb);
+      pad.volume.value = -24;
+
+      // Hold the tonic throughout
+      pad.triggerAttackRelease(['F2','C3','Eb3'], '2n', 0);
+      pad.triggerAttackRelease(['Db2','Ab2','C3'], '2n', bar);
+      pad.triggerAttackRelease(['Ab2','Eb3','G3'], '2n', bar * 2);
+      pad.triggerAttackRelease(['Eb2','Bb2','D3'], '2n', bar * 3);
+
+      // ── Rhodes — chorus shimmer + reverb ────────────────────────────────
+      const chorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.4, wet: 0.45 }).connect(reverb);
+      chorus.start();
+      const rhodes = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.025, decay: 0.5, sustain: 0.62, release: 2.2 }
+      }).connect(chorus);
+      rhodes.volume.value = -9;
+
+      // Fm9 – Dbmaj9 – Abmaj7 – Ebmaj7 (4-bar loop × 2 passes + variation)
+      const changes = [
+        { chord: ['F3','Ab3','C4','Eb4','G4'],   time: 0          }, // Fm9
+        { chord: ['Db3','F3','Ab3','C4','Eb4'],  time: bar        }, // Dbmaj9
+        { chord: ['Ab2','Eb3','G3','C4'],        time: bar * 2    }, // Abmaj7
+        { chord: ['Eb3','G3','Bb3','D4'],        time: bar * 3    }, // Ebmaj7
+        // Second pass with richer upper voicing
+        { chord: ['F3','Ab3','C4','G4'],         time: bar * 4    }, // Fm add9
+        { chord: ['Db3','Ab3','C4','F4'],        time: bar * 4 + bar }, // Dbmaj9/Ab
+      ];
+      changes.forEach(({ chord, time }) => rhodes.triggerAttackRelease(chord, '1n', time));
+
+      // ── Warm syncopated bass ─────────────────────────────────────────────
+      const bass = new Tone.Synth({
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.014, decay: 0.18, sustain: 0.48, release: 0.28 }
+      }).connect(comp);
+      bass.volume.value = -5;
+
+      // Neo-soul bass: root on 1, anticipation (16th early) into beat 3, fill at end
+      const bassPattern = (root, fifth, t) => [
+        { note: root,  time: t                    }, // beat 1
+        { note: root,  time: t + q + s16          }, // "and-a" of beat 2 (anticipates 3)
+        { note: fifth, time: t + q * 2            }, // beat 3
+        { note: root,  time: t + q * 3 + s16 * 2 }, // syncopated fill before bar end
+      ];
+
+      [
+        ['F2',  'C3',  0        ],
+        ['Db2', 'Ab2', bar      ],
+        ['Ab1', 'Eb2', bar * 2  ],
+        ['Eb2', 'Bb2', bar * 3  ],
+        ['F2',  'C3',  bar * 4  ],
+        ['Db2', 'Ab2', bar * 4 + bar],
+      ].forEach(([root, fifth, t]) => {
+        bassPattern(root, fifth, t).forEach(({ note, time }) =>
+          bass.triggerAttackRelease(note, '8n', time));
+      });
+
+      // ── Kick (soft, beat 1 and 3) ────────────────────────────────────────
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.055, octaves: 5,
+        envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.3 }
+      }).connect(comp);
+      kick.volume.value = -14;
+
+      // Kicks enter on bar 2 (let Rhodes establish first)
+      for (let rep = 1; rep < 5; rep++) {
+        kick.triggerAttackRelease('C1', '8n', rep * bar);           // beat 1
+        kick.triggerAttackRelease('C1', '8n', rep * bar + q * 2);   // beat 3
+        // Syncopated ghost kick on the "and" of 4 every other bar
+        if (rep % 2 === 0) kick.triggerAttackRelease('C1', '8n', rep * bar + q * 3.5);
+      }
+
+      // ── Brush snare on 2 and 4 ──────────────────────────────────────────
+      const snareBp = new Tone.Filter(2600, 'bandpass').connect(reverb);
+      const snare   = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.003, decay: 0.13, sustain: 0, release: 0.06 }
+      }).connect(snareBp);
+      snare.volume.value = -20;
+
+      for (let rep = 1; rep < 5; rep++) {
+        snare.triggerAttackRelease('8n', rep * bar + q);       // beat 2
+        snare.triggerAttackRelease('8n', rep * bar + q * 3);   // beat 4
+      }
+
+      // ── Hi-hats: 8ths with 16th fill before beat 3 ──────────────────────
+      const hat = new Tone.MetalSynth({
+        frequency: 500, harmonicity: 5.1, modulationIndex: 24,
+        resonance: 4000, octaves: 1.5,
+        envelope: { attack: 0.001, decay: 0.05, release: 0.01 }
+      }).connect(reverb);
+      hat.volume.value = -24;
+
+      for (let rep = 1; rep < 5; rep++) {
+        // Regular 8th notes
+        for (let i = 0; i < 8; i++) hat.triggerAttackRelease('16n', rep * bar + i * s8);
+        // 16th-note fill going into beat 3 (soul fill)
+        hat.triggerAttackRelease('16n', rep * bar + q * 2 - s16 * 2);
+        hat.triggerAttackRelease('16n', rep * bar + q * 2 - s16);
+      }
+
+      // ── Melody (enters bar 3) — smooth Rhodes phrase ─────────────────────
+      const melDelay = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.18, wet: 0.22 }).connect(reverb);
+      const melody   = new Tone.Synth({
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.04, decay: 0.35, sustain: 0.5, release: 1.5 }
+      }).connect(melDelay);
+      melody.volume.value = -13;
+
+      // Silky descending/ascending phrase — Fm pentatonic flavour
+      const phrase = [
+        { note: 'C5',  time: bar * 2,           dur: '8n'  },
+        { note: 'Ab4', time: bar * 2 + s8,      dur: '8n'  },
+        { note: 'G4',  time: bar * 2 + s8*2,    dur: '4n'  },
+        { note: 'Eb4', time: bar * 2 + s8*4,    dur: '8n'  },
+        { note: 'F4',  time: bar * 2 + s8*5,    dur: '4n.' },
+        { note: 'G4',  time: bar * 3 + q,       dur: '8n'  },
+        { note: 'Ab4', time: bar * 3 + q + s8,  dur: '8n'  },
+        { note: 'C5',  time: bar * 3 + q*2,     dur: '2n'  },
+        { note: 'Bb4', time: bar * 4 + s8,      dur: '4n'  },
+        { note: 'Ab4', time: bar * 4 + s8*3,    dur: '4n'  },
+        { note: 'G4',  time: bar * 4 + s8*5,    dur: '2n'  },
+      ];
+      phrase.forEach(({ note, time, dur }) => melody.triggerAttackRelease(note, dur, time));
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<div id="tuneframes" style="display:none">{"bpm":82,"duration":"12s"}</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<script>
+// TuneFrames — Downtempo / Trip-Hop
+// Portishead/Massive Attack: syncopated breakbeat, vinyl crackle,
+// sub bass movement, AMSynth eerie melody, BitCrusher grit
+
+async function main() {
+  await Tone.start();
+
+  Tone.Transport.bpm.value = 82;
+
+  const beat = 60 / 82;          // one quarter note in seconds ≈ 0.732s
+  const eighth = beat / 2;       // ≈ 0.366s
+  const sixteenth = beat / 4;    // ≈ 0.183s
+
+  // ── Effects chain ──────────────────────────────────────────────────────────
+  const reverb = new Tone.Reverb({ decay: 5.5, preDelay: 0.03, wet: 0.65 });
+  await reverb.generate();
+  reverb.toDestination();
+
+  const filter = new Tone.Filter({ frequency: 2200, type: 'lowpass', rolloff: -24 });
+  filter.connect(reverb);
+
+  const bitCrusher = new Tone.BitCrusher(7);
+  bitCrusher.connect(reverb);
+
+  // ── Vinyl crackle — pink noise, always running ─────────────────────────────
+  // Constant sustain with no attack creates the "record playing" texture
+  const crackle = new Tone.NoiseSynth({
+    noise: { type: 'pink' },
+    envelope: { attack: 0.1, decay: 0.1, sustain: 1.0, release: 0.5 },
+    volume: -30,
+  }).toDestination();
+  // Start immediately in offline context
+  Tone.Transport.scheduleOnce((t) => crackle.triggerAttack(t), 0);
+
+  // ── Sub bass — pure sine, root movement ───────────────────────────────────
+  const bass = new Tone.MonoSynth({
+    oscillator: { type: 'sine' },
+    filter: { Q: 3, frequency: 110, type: 'lowpass', rolloff: -24 },
+    filterEnvelope: {
+      attack: 0.05, decay: 0.6, sustain: 0.3, release: 0.8,
+      baseFrequency: 60, octaves: 1.2,
+    },
+    envelope: { attack: 0.02, decay: 0.25, sustain: 0.65, release: 0.5 },
+    volume: -3,
+  }).toDestination();
+
+  // ── Eerie melody — AMSynth for trembling character ────────────────────────
+  const lead = new Tone.AMSynth({
+    harmonicity: 2.8,
+    oscillator: { type: 'sawtooth' },
+    envelope: { attack: 0.18, decay: 0.7, sustain: 0.35, release: 2.0 },
+    modulation: { type: 'sine' },
+    modulationEnvelope: {
+      attack: 0.4, decay: 0.0, sustain: 1.0, release: 0.8,
+    },
+    volume: -14,
+  });
+  lead.connect(filter);
+
+  // ── Kick — heavy, syncopated (NOT four-on-the-floor) ─────────────────────
+  const kick = new Tone.MembraneSynth({
+    pitchDecay: 0.1, octaves: 12,
+    envelope: { attack: 0.001, decay: 0.62, sustain: 0, release: 0.15 },
+    volume: -1,
+  }).toDestination();
+
+  // ── Snare — pink noise, sits late on 2 and 4 (swung feel) ────────────────
+  const snare = new Tone.NoiseSynth({
+    noise: { type: 'pink' },
+    envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.14 },
+    volume: -8,
+  });
+  snare.connect(bitCrusher);
+
+  // ── Hi-hat — sparse, off-beat 16th accents ────────────────────────────────
+  const hihat = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 },
+    volume: -22,
+  }).toDestination();
+
+  // ── Schedule: bass enters at 0, beat at 2s, melody at 5s ─────────────────
+
+  // Bass line: D2 → A2 → F2 → G2 (minor feel, moves every 2 beats)
+  // Crackle plays from 0, bass from ~0, drums from 2s, melody from 5s
+  const bassNotes = [
+    { note: 'D2', t: 0 },
+    { note: 'A1', t: beat * 2 },
+    { note: 'F1', t: beat * 4 },
+    { note: 'G1', t: beat * 6 },
+    { note: 'D2', t: beat * 8 },
+    { note: 'A1', t: beat * 10 },
+    { note: 'F1', t: beat * 12 },
+    { note: 'G1', t: beat * 14 },
+  ];
+  bassNotes.forEach(({ note, t }) => {
+    if (t < 12) {
+      Tone.Transport.scheduleOnce((time) => {
+        bass.triggerAttackRelease(note, '4n', time);
+      }, t);
+    }
+  });
+
+  // Breakbeat kick pattern (syncopated — not on every beat)
+  // Pattern over 2 bars: beats 1, the-and-of-2, 3, the-and-of-4
+  // In 8ths at 82 BPM: positions 0, 3, 4, 7 out of 8
+  const kickPattern = [0, 3, 4, 7]; // 8th-note positions
+  for (let bar = 0; bar < 4; bar++) {
+    kickPattern.forEach((pos) => {
+      const t = 2.0 + bar * eighth * 8 + pos * eighth;
+      if (t < 12) {
+        Tone.Transport.scheduleOnce((time) => kick.triggerAttackRelease('C1', '8n', time), t);
+      }
+    });
+  }
+
+  // Snare: beats 2 and 4 but slightly swung (pushed ~30ms late)
+  const snareSwing = 0.03;
+  const snarePattern = [1, 3, 5, 7]; // 8th positions = beats 2, 4 etc
+  for (let bar = 0; bar < 4; bar++) {
+    snarePattern.filter((_, i) => i % 2 === 0).forEach((pos) => {
+      const t = 2.0 + bar * eighth * 8 + pos * eighth + snareSwing;
+      if (t < 12) {
+        Tone.Transport.scheduleOnce((time) => snare.triggerAttackRelease('8n', time), t);
+      }
+    });
+  }
+
+  // Sparse hi-hat: 16th-note accents on the off-offbeats
+  const hihatPositions = [1, 5, 9, 13]; // 16th positions
+  for (let bar = 0; bar < 4; bar++) {
+    hihatPositions.forEach((pos) => {
+      const t = 2.0 + bar * sixteenth * 16 + pos * sixteenth;
+      if (t < 12) {
+        Tone.Transport.scheduleOnce((time) => hihat.triggerAttackRelease('16n', time), t);
+      }
+    });
+  }
+
+  // Eerie melody: enters at 5s, D minor descending line
+  // D4 → C4 → Bb3 → A3 → G3 → A3 (minor descent, last note back up)
+  const melodyNotes = [
+    { note: 'D4',  dur: '4n',  t: 5.0 },
+    { note: 'C4',  dur: '4n',  t: 5.0 + beat },
+    { note: 'Bb3', dur: '4n',  t: 5.0 + beat * 2 },
+    { note: 'A3',  dur: '2n',  t: 5.0 + beat * 3 },
+    { note: 'G3',  dur: '4n',  t: 5.0 + beat * 5 },
+    { note: 'A3',  dur: '2n',  t: 5.0 + beat * 6 },
+    { note: 'D4',  dur: '4n',  t: 5.0 + beat * 8 },
+    { note: 'C4',  dur: '4n',  t: 5.0 + beat * 9 },
+  ];
+  melodyNotes.forEach(({ note, dur, t }) => {
+    if (t < 12) {
+      Tone.Transport.scheduleOnce((time) => lead.triggerAttackRelease(note, dur, time), t);
+    }
+  });
+
+  Tone.Transport.start();
+}
+
+window.renderComposition = async function(wavPath) {
+  let attempts = 0;
+  while (typeof Tone === 'undefined' && attempts < 50) {
+    await new Promise(r => setTimeout(r, 100));
+    attempts++;
+  }
+  if (typeof Tone === 'undefined') throw new Error('Tone not loaded');
+
+  const meta = JSON.parse(document.getElementById('tuneframes').textContent);
+  const durationSec = parseFloat(meta.duration) + 1.5;
+
+  const buffer = await Tone.Offline(async () => { await main(); }, durationSec, 1, 44100);
+  const wav = audioBufferToWav(buffer);
+  window.writeFile(wavPath, Array.from(new Uint8Array(wav)));
+  return wav.byteLength;
+};
+</script>

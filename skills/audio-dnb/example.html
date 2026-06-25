@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TuneFrames — Drum and Bass</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <!-- TuneFrames Metadata -->
+  <div id="tuneframes"
+    data-bpm="174"
+    data-duration="12s"
+    data-genre="dnb"
+    data-key="D minor"
+    style="display:none">
+  </div>
+
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 174;
+
+      // --- MASTER BUS ---
+      const masterLimiter = new Tone.Limiter(-1).toDestination();
+      const masterGain = new Tone.Gain(0.87).connect(masterLimiter);
+
+      // --- KICK — short, punchy, sub-heavy ---
+      const kickGain = new Tone.Gain(0.9).connect(masterGain);
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.038,
+        octaves: 5,
+        envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.07 }
+      }).connect(kickGain);
+
+      // --- SNARE — crisp white noise ---
+      const snareVerb = new Tone.Reverb({ decay: 0.45, wet: 0.14 }).connect(masterGain);
+      const snareGain = new Tone.Gain(0.65).connect(snareVerb);
+      const snare = new Tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.001, decay: 0.11, sustain: 0, release: 0.035 }
+      }).connect(snareGain);
+
+      // --- HI-HAT — fast texture between beats ---
+      const hatGain = new Tone.Gain(0.28).connect(masterGain);
+      const hat = new Tone.MetalSynth({
+        frequency: 520,
+        envelope: { attack: 0.001, decay: 0.032, release: 0.01 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4600,
+        octaves: 1.5
+      }).connect(hatGain);
+
+      // --- REESE BASS — MonoSynth sawtooth + Chorus + Filter ---
+      // The Reese is the defining DnB sound: two slightly detuned saws = chorus
+      const reeseLimiter = new Tone.Limiter(-4).connect(masterGain);
+      const reeseFilter = new Tone.Filter({ frequency: 500, type: "lowpass", Q: 2.5 }).connect(reeseLimiter);
+      const reeseChorus = new Tone.Chorus({
+        frequency: 1.7,
+        delayTime: 3.5,
+        depth: 0.78,
+        wet: 0.72
+      }).connect(reeseFilter);
+      reeseChorus.start();
+      const reese = new Tone.MonoSynth({
+        oscillator: { type: "sawtooth" },
+        filter: { Q: 1.5, type: "lowpass", frequency: 3000 },
+        filterEnvelope: {
+          attack: 0.02, decay: 0.6, sustain: 0.5, release: 0.4,
+          baseFrequency: 180, octaves: 2.5
+        },
+        envelope: { attack: 0.008, decay: 0.4, sustain: 0.8, release: 0.35 },
+        volume: 0
+      }).connect(reeseChorus);
+
+      // --- ATMOSPHERIC PAD — slow attack, very wet reverb ---
+      const padVerb = new Tone.Reverb({ decay: 5.5, wet: 0.72 }).connect(masterGain);
+      const padGain = new Tone.Gain(0.45).connect(padVerb);
+      const pad = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "sawtooth4" },
+        envelope: { attack: 0.7, decay: 1.2, sustain: 0.6, release: 3.0 },
+        volume: -2
+      }).connect(padGain);
+
+      // --- BREAKBEAT PATTERN — syncopated Amen-style ---
+      // K=kick, S=snare, h=hat, .=rest
+      // Pattern: .  .  S  .  K  K  S  .  .  K  .  S  K  .  S  h
+      const breakSeq = new Tone.Sequence((time, hit) => {
+        if (hit === "K") kick.triggerAttackRelease("C1", "8n", time);
+        if (hit === "S") snare.triggerAttackRelease("16n", time, 0.85);
+        if (hit === "s") snare.triggerAttackRelease("16n", time, 0.45); // ghost snare
+        if (hit === "h") hat.triggerAttackRelease("32n", time, 0.5);
+      }, [
+        null, "h", "S",  null, "K",  "K",  "S",  null,
+        "h",  "K", null, "S",  "K",  "h",  "S",  "h"
+      ], "16n");
+      breakSeq.start(0);
+
+      // --- REESE BASS LINE — D minor, sustained long notes ---
+      // Reese bass plays whole-bar notes — the filter movement IS the melody
+      const reeseLine = [
+        { note: "D1", dur: "1m", time: "2m" },
+        { note: "C1", dur: "1m", time: "3m" },
+        { note: "Bb0", dur: "1m", time: "4m" },
+        { note: "A0",  dur: "1m", time: "5m" },
+        { note: "D1",  dur: "1m", time: "6m" },
+        { note: "F1",  dur: "1m", time: "7m" },
+      ];
+      reeseLine.forEach(({ note, dur, time }) => {
+        reese.triggerAttackRelease(note, dur, time);
+      });
+
+      // Filter sweep on Reese — opens over bars 3-5, closes back bar 6-7
+      const sweepStart = Tone.Time("2m").toSeconds();
+      reeseFilter.frequency.setValueAtTime(300, sweepStart);
+      reeseFilter.frequency.exponentialRampToValueAtTime(2200, sweepStart + 4);
+      reeseFilter.frequency.exponentialRampToValueAtTime(250, sweepStart + 5.5);
+      reeseFilter.frequency.exponentialRampToValueAtTime(1800, sweepStart + 9);
+
+      // --- PAD — atmospheric Dm chord, enters at bar 4 ---
+      const padNotes = ["D3", "F3", "A3", "C4"]; // Dm7
+      pad.triggerAttackRelease(padNotes, "4m", "3m");
+      pad.triggerAttackRelease(["C3", "Eb3", "G3", "Bb3"], "4m", "7m"); // Cm7
+
+      // --- START & STOP ---
+      Tone.Transport.start();
+      Tone.Transport.stop("+12");
+    }
+
+    main();
+  </script>
+</body>
+</html>

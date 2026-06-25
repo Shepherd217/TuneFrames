@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TuneFrames — Techno</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <!-- TuneFrames Metadata -->
+  <div id="tuneframes"
+    data-bpm="136"
+    data-duration="12s"
+    data-genre="techno"
+    data-key="A minor"
+    style="display:none">
+  </div>
+
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 136;
+
+      // --- MASTER BUS ---
+      const masterLimiter = new Tone.Limiter(-1).toDestination();
+      const masterGain = new Tone.Gain(0.85).connect(masterLimiter);
+
+      // --- KICK — hard MembraneSynth ---
+      const kickGain = new Tone.Gain(0.9).connect(masterGain);
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.07,
+        octaves: 10,
+        envelope: { attack: 0.001, decay: 0.38, sustain: 0, release: 0.1 }
+      }).connect(kickGain);
+
+      // --- ACID BASS — MonoSynth sawtooth through distortion ---
+      const bassLimiter = new Tone.Limiter(-4).connect(masterGain);
+      const bassDist = new Tone.Distortion({ distortion: 0.55, wet: 0.7 }).connect(bassLimiter);
+      const bassFilter = new Tone.Filter({ frequency: 400, type: "lowpass", rolloff: -24, Q: 3 }).connect(bassDist);
+      const bass = new Tone.MonoSynth({
+        oscillator: { type: "sawtooth" },
+        filter: { Q: 7, type: "lowpass", rolloff: -24 },
+        filterEnvelope: {
+          attack: 0.002, decay: 0.25, sustain: 0.2, release: 0.5,
+          baseFrequency: 70, octaves: 3.5
+        },
+        envelope: { attack: 0.001, decay: 0.25, sustain: 0.5, release: 0.3 },
+        volume: -2
+      }).connect(bassFilter);
+
+      // --- HI-HAT — tight MetalSynth ---
+      const hatGain = new Tone.Gain(0.45).connect(masterGain);
+      const hat = new Tone.MetalSynth({
+        frequency: 400,
+        envelope: { attack: 0.001, decay: 0.045, release: 0.01 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4200,
+        octaves: 1.5
+      }).connect(hatGain);
+
+      // --- STAB — sparse cold PolySynth ---
+      const stabReverb = new Tone.Reverb({ decay: 1.8, wet: 0.35 }).connect(masterGain);
+      const stab = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "square4" },
+        envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.08 },
+        volume: -14
+      }).connect(stabReverb);
+
+      // Stab chords — dissonant, industrial
+      const stabNotes = [["A2", "Eb3"], ["A2", "D3"], null, ["G2", "C#3"]];
+
+      // --- SEQUENCES ---
+
+      // Kick: 4-on-the-floor with ghost on bar 2 last 16th
+      const kickPattern = new Tone.Sequence((time, val) => {
+        if (val) kick.triggerAttackRelease("C1", "8n", time);
+      }, ["C1", null, null, null, "C1", null, null, null,
+          "C1", null, null, null, "C1", null, "C1", null], "16n");
+      kickPattern.start(0);
+
+      // Hi-hat: 16th notes, velocity variation
+      let hatStep = 0;
+      const hatVels = [0.75, 0.35, 0.75, 0.35, 0.75, 0.35, 0.95, 0.35,
+                       0.75, 0.35, 0.75, 0.35, 0.75, 0.45, 0.95, 0.55];
+      const hatSeq = new Tone.Sequence((time) => {
+        hat.triggerAttackRelease("32n", time, hatVels[hatStep % 16]);
+        hatStep++;
+      }, new Array(16).fill(1), "16n");
+      hatSeq.start(0);
+
+      // Bass: acid pattern — A1 root with chromatic movement
+      const bassLine = [
+        { note: "A1", dur: "8n" }, { note: null },
+        { note: "A1", dur: "16n" }, { note: "A1", dur: "16n" },
+        { note: null }, { note: "C2", dur: "8n" },
+        { note: null }, { note: "A1", dur: "16n" },
+        { note: "A1", dur: "8n" }, { note: null },
+        { note: "Bb1", dur: "16n" }, { note: "A1", dur: "16n" },
+        { note: null }, { note: "G1", dur: "16n" },
+        { note: null }, { note: "A1", dur: "8n" }
+      ];
+      let bassStep = 0;
+      const bassSeq = new Tone.Sequence((time) => {
+        const step = bassLine[bassStep % bassLine.length];
+        if (step.note) bass.triggerAttackRelease(step.note, step.dur, time);
+        bassStep++;
+      }, new Array(16).fill(1), "16n");
+      bassSeq.start("2m"); // bass enters at bar 3
+
+      // Stabs: every 2 bars on beat 3
+      let stabStep = 0;
+      const stabSeq = new Tone.Sequence((time) => {
+        const chord = stabNotes[stabStep % stabNotes.length];
+        if (chord) stab.triggerAttackRelease(chord, "32n", time);
+        stabStep++;
+      }, [1, null, null, null, null, null, null, null], "2n");
+      stabSeq.start("4m"); // stabs enter at bar 5
+
+      // --- BASS FILTER SWEEP — signature acid movement ---
+      const sweepStart = Tone.Time("2m").toSeconds();
+      bassFilter.frequency.setValueAtTime(200, sweepStart);
+      bassFilter.frequency.linearRampToValueAtTime(2800, sweepStart + 4);
+      bassFilter.frequency.linearRampToValueAtTime(150, sweepStart + 4.5);
+      bassFilter.frequency.linearRampToValueAtTime(1800, sweepStart + 8);
+
+      // --- START & STOP ---
+      Tone.Transport.start();
+      Tone.Transport.stop("+12");
+    }
+
+    main();
+  </script>
+</body>
+</html>

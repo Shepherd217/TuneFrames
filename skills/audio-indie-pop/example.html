@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TuneFrames — Indie Pop</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <!-- TuneFrames Metadata -->
+  <div id="tuneframes"
+    data-bpm="128"
+    data-duration="12s"
+    data-genre="indie-pop"
+    data-key="G major"
+    style="display:none">
+  </div>
+
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 128;
+
+      // --- MASTER BUS ---
+      const masterLimiter = new Tone.Limiter(-1).toDestination();
+      const masterGain = new Tone.Gain(0.85).connect(masterLimiter);
+
+      // --- GUITAR — jangly pluck through chorus + reverb ---
+      const guitarVerb = new Tone.Reverb({ decay: 2.5, wet: 0.35 }).connect(masterGain);
+      const guitarChorus = new Tone.Chorus({ frequency: 3.5, delayTime: 2, depth: 0.6, wet: 0.5 }).connect(guitarVerb);
+      guitarChorus.start();
+      const guitarGain = new Tone.Gain(0.55).connect(guitarChorus);
+      const guitar = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "triangle" },
+        envelope: { attack: 0.005, decay: 0.28, sustain: 0.06, release: 0.7 },
+        volume: 0
+      }).connect(guitarGain);
+
+      // --- BASS — warm sine, root movement ---
+      const bassVerb = new Tone.Reverb({ decay: 0.6, wet: 0.1 }).connect(masterGain);
+      const bassGain = new Tone.Gain(0.65).connect(bassVerb);
+      const bass = new Tone.Synth({
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 0.4 },
+        volume: 0
+      }).connect(bassGain);
+
+      // --- KICK — punchy but not hard ---
+      const kickDist = new Tone.Distortion({ distortion: 0.1, wet: 0.3 }).connect(masterGain);
+      const kickGain = new Tone.Gain(0.75).connect(kickDist);
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.06,
+        octaves: 5,
+        envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.1 }
+      }).connect(kickGain);
+
+      // --- SNARE — white noise with moderate reverb ---
+      const snareVerb = new Tone.Reverb({ decay: 0.9, wet: 0.38 }).connect(masterGain);
+      const snareGain = new Tone.Gain(0.45).connect(snareVerb);
+      const snare = new Tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.05 }
+      }).connect(snareGain);
+
+      // --- HI-HAT — highpass filtered, airy ---
+      const hatFilter = new Tone.Filter(7000, "highpass").connect(masterGain);
+      const hatGain = new Tone.Gain(0.22).connect(hatFilter);
+      const hat = new Tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.01 }
+      }).connect(hatGain);
+
+      // --- ARPEGGIO — 4-bar G–C–Em–D chord cycle, 8th note grid ---
+      // 8 notes per bar × 4 bars = 32-note grid, loops seamlessly
+      const arpGrid = [
+        // Bar 0: G major
+        "G3","B3","D4","G4","D4","B3","G3","B3",
+        // Bar 1: C major
+        "C4","E4","G4","C5","G4","E4","C4","E4",
+        // Bar 2: E minor
+        "E3","G3","B3","E4","B3","G3","E3","G3",
+        // Bar 3: D major
+        "D3","F#3","A3","D4","A3","F#3","D3","F#3",
+      ];
+      let arpStep = 0;
+      const arpSeq = new Tone.Sequence((time) => {
+        guitar.triggerAttackRelease(arpGrid[arpStep % arpGrid.length], "8n", time);
+        arpStep++;
+      }, new Array(8).fill(1), "8n");
+      arpSeq.start(0);
+
+      // --- BASS — root + 5th pattern per chord, enters bar 3 ---
+      const bassPart = new Tone.Part((time, note) => {
+        bass.triggerAttackRelease(note, "4n", time);
+      }, [
+        ["0:0:0","G2"], ["0:2:0","D2"],
+        ["1:0:0","C2"], ["1:2:0","G2"],
+        ["2:0:0","E2"], ["2:2:0","B2"],
+        ["3:0:0","D2"], ["3:2:0","A2"],
+      ]);
+      bassPart.loopEnd = "4m";
+      bassPart.loop = true;
+      bassPart.start("2m");
+
+      // --- KICK — beats 1 and 3, enters bar 3 ---
+      const kickSeq = new Tone.Sequence((time, val) => {
+        if (val) kick.triggerAttackRelease("C1", "8n", time);
+      }, ["C1",null,null,null,null,null,null,null,"C1",null,null,null,null,null,null,null], "16n");
+      kickSeq.start("2m");
+
+      // --- SNARE — beats 2 and 4, enters bar 3 ---
+      const snareSeq = new Tone.Sequence((time, val) => {
+        if (val) snare.triggerAttackRelease("8n", time);
+      }, [null,null,null,null,1,null,null,null,null,null,null,null,1,null,null,null], "16n");
+      snareSeq.start("2m");
+
+      // --- HI-HAT — 8th notes throughout ---
+      const hatSeq = new Tone.Sequence((time, val) => {
+        if (val) hat.triggerAttackRelease("16n", time, 0.5);
+      }, [1,null,1,null,1,null,1,null,1,null,1,null,1,null,1,null], "16n");
+      hatSeq.start(0);
+
+      // --- START & STOP ---
+      Tone.Transport.start();
+      Tone.Transport.stop("+12");
+    }
+
+    main();
+  </script>
+</body>
+</html>

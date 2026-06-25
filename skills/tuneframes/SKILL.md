@@ -159,3 +159,63 @@ tuneframes render <file.html> --format wav [--output <out.wav>]
 tuneframes preview <file.html>   # Live preview in browser
 tuneframes init <name>          # Scaffold new project
 ```
+
+---
+
+# TuneFrames — Sample Instruments
+
+Extends the core TuneFrames skill with real instrument samples via CDN.
+
+## Sample Pattern (Tone.Sampler + gleitz CDN)
+
+Every sample composition must:
+1. Create Tone.Sampler instances with CDN baseUrl
+2. Call `await Tone.loaded()` before scheduling any notes
+3. Then schedule all notes using the loaded sampler
+
+```js
+async function main() {
+  await Tone.start();
+
+  // Load piano from CDN
+  const piano = new Tone.Sampler({
+    urls: { A4: 'A4.mp3', C4: 'C4.mp3', 'F#4': 'Fs4.mp3', A5: 'A5.mp3' },
+    baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/'
+  }).toDestination();
+
+  // CRITICAL: wait for samples to load before scheduling
+  await Tone.loaded();
+
+  // Now schedule notes
+  piano.triggerAttackRelease('C4', '4n', 0);
+  piano.triggerAttackRelease('E4', '4n', '4n');
+  piano.triggerAttackRelease('G4', '2n', '2n');
+}
+```
+
+## Available Instruments (gleitz FluidR3_GM)
+
+Full registry: `registry/samples.json` — includes all URL mappings and per-instrument notes.
+
+| Key | CDN path suffix | Category | Best range |
+|-----|----------------|----------|------------|
+| `acoustic_grand_piano` | `acoustic_grand_piano-mp3` | Piano | A0–C8 |
+| `acoustic_bass` | `acoustic_bass-mp3` | Bass | C1–C4 |
+| `string_ensemble_1` | `string_ensemble_1-mp3` | Strings | C2–C7 |
+| `brass_section` | `brass_section-mp3` | Brass | C2–C6 |
+| `acoustic_guitar_nylon` | `acoustic_guitar_nylon-mp3` | Guitar | Fs2–C6 |
+| `vibraphone` | `vibraphone-mp3` | Mallet | C3–C7 |
+| `flute` | `flute-mp3` | Woodwind | C4–A7 |
+| `choir_aahs` | `choir_aahs-mp3` | Choir | C3–G5 |
+
+CDN base: `https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/{instrument}-mp3/`
+
+Sharp notes use `s` suffix in filenames: F#4 → `Fs4.mp3`, D#3 → `Ds3.mp3`.
+
+## Presets
+
+Ready-to-render compositions in `registry/presets/`:
+
+- `piano-salamander.html` — Am–F–C–G chord progression, acoustic grand piano, 8s
+- `drums-808.html` — Trap 808 pattern, MembraneSynth + MetalSynth (no CDN), 7s
+- `bass-electric.html` — Walking bass line in C minor, acoustic bass, 6s

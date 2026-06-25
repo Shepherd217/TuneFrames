@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TuneFrames — House</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <!-- TuneFrames Metadata -->
+  <div id="tuneframes"
+    data-bpm="124"
+    data-duration="12s"
+    data-genre="house"
+    data-key="F minor"
+    style="display:none">
+  </div>
+
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 124;
+
+      // --- MASTER BUS ---
+      const masterLimiter = new Tone.Limiter(-1).toDestination();
+      const masterGain = new Tone.Gain(0.88).connect(masterLimiter);
+
+      // --- KICK — warm 4-on-the-floor ---
+      const kickGain = new Tone.Gain(0.85).connect(masterGain);
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.055,
+        octaves: 6,
+        envelope: { attack: 0.001, decay: 0.28, sustain: 0, release: 0.1 }
+      }).connect(kickGain);
+
+      // --- CLAP — white noise with long reverb tail ---
+      const clapVerb = new Tone.Reverb({ decay: 2.4, wet: 0.52 }).connect(masterGain);
+      const clapGain = new Tone.Gain(0.55).connect(clapVerb);
+      const clap = new Tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.001, decay: 0.11, sustain: 0, release: 0.04 }
+      }).connect(clapGain);
+
+      // --- HI-HAT — open off-beat, airy ---
+      const hatGain = new Tone.Gain(0.38).connect(masterGain);
+      const hat = new Tone.MetalSynth({
+        frequency: 300,
+        envelope: { attack: 0.001, decay: 0.09, release: 0.025 },
+        harmonicity: 3.1,
+        modulationIndex: 16,
+        resonance: 3600,
+        octaves: 1.2
+      }).connect(hatGain);
+
+      // --- PIANO STAB — PolySynth triangle, warm chord stabs ---
+      const stabVerb = new Tone.Reverb({ decay: 1.6, wet: 0.28 }).connect(masterGain);
+      const stabChorus = new Tone.Chorus({ frequency: 2.5, depth: 0.35, wet: 0.25 }).connect(stabVerb);
+      stabChorus.start();
+      const stabGain = new Tone.Gain(0.55).connect(stabChorus);
+      const piano = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "triangle" },
+        envelope: { attack: 0.008, decay: 0.35, sustain: 0.08, release: 0.7 },
+        volume: 0
+      }).connect(stabGain);
+
+      // --- BASS — punchy, follows kick ---
+      const bassGain = new Tone.Gain(0.75).connect(masterGain);
+      const bass = new Tone.MonoSynth({
+        oscillator: { type: "sawtooth" },
+        filter: { Q: 3, type: "lowpass", rolloff: -24 },
+        filterEnvelope: {
+          attack: 0.001, decay: 0.18, sustain: 0.1, release: 0.2,
+          baseFrequency: 90, octaves: 2.2
+        },
+        envelope: { attack: 0.001, decay: 0.22, sustain: 0.1, release: 0.15 },
+        volume: -2
+      }).connect(bassGain);
+
+      // --- SEQUENCES ---
+
+      // Kick: strict 4-on-the-floor
+      const kickSeq = new Tone.Sequence((time) => {
+        kick.triggerAttackRelease("C1", "8n", time);
+      }, [1, null, null, null, 1, null, null, null,
+          1, null, null, null, 1, null, null, null], "16n");
+      kickSeq.start(0);
+
+      // Clap: beats 2 and 4 only
+      const clapSeq = new Tone.Sequence((time, val) => {
+        if (val) clap.triggerAttackRelease("16n", time);
+      }, [null, null, null, null, 1, null, null, null,
+          null, null, null, null, 1, null, null, null], "16n");
+      clapSeq.start(0);
+
+      // Hi-hat: off-beat 8th notes
+      const hatSeq = new Tone.Sequence((time, val) => {
+        if (val) hat.triggerAttackRelease("16n", time, 0.6);
+      }, [null, null, 1, null, null, null, 1, null,
+          null, null, 1, null, null, null, 1, null], "16n");
+      hatSeq.start(0);
+
+      // Bass: follows kick + syncopated fills
+      // F1 root following the groove
+      const bassPattern = [
+        "F1", null, null, null, "F1", null, null, "F1",
+        "F1", null, "Ab1", null, "F1", null, "Eb1", null
+      ];
+      const bassSeq = new Tone.Sequence((time, note) => {
+        if (note) bass.triggerAttackRelease(note, "16n", time);
+      }, bassPattern, "16n");
+      bassSeq.start("2m"); // bass enters bar 3
+
+      // Piano stabs: Fm7 → Bbm7 → Ebmaj7 → Dbmaj7 (2-bar cycle)
+      // Deep house chord vocabulary
+      const chords = [
+        { notes: ["F3", "Ab3", "C4", "Eb4"], time: "4m" },      // Fm7
+        { notes: ["Bb2", "Db3", "F3", "Ab3"], time: "4m:2" },   // Bbm7
+        { notes: ["Eb3", "G3", "Bb3", "D4"], time: "5m" },      // Ebmaj7
+        { notes: ["Db3", "F3", "Ab3", "C4"], time: "5m:2" },    // Dbmaj7
+        // repeat
+        { notes: ["F3", "Ab3", "C4", "Eb4"], time: "6m" },
+        { notes: ["Bb2", "Db3", "F3", "Ab3"], time: "6m:2" },
+        { notes: ["Eb3", "G3", "Bb3", "D4"], time: "7m" },
+        { notes: ["Db3", "F3", "Ab3", "C4"], time: "7m:2" },
+      ];
+      chords.forEach(({ notes, time }) => {
+        piano.triggerAttackRelease(notes, "4n", time);
+      });
+
+      // --- START & STOP ---
+      Tone.Transport.start();
+      Tone.Transport.stop("+12");
+    }
+
+    main();
+  </script>
+</body>
+</html>

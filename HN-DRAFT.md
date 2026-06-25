@@ -1,84 +1,76 @@
-# TuneFrames: Every AI Agent Can Now Compose Music
+# I built an open-source Suno killer for AI agents — 22 skills, 20 genres, real instrument samples
 
-**tl;dr:** Same idea as Hyperframes — write compositions in HTML with Tone.js, one CLI command renders to MP3. Built for agents. Apache 2.0. Published today. https://www.npmjs.com/package/tuneframes
+**tl;dr:** TuneFrames v0.2.0. Write music as HTML + Tone.js, render to MP3 with one CLI command. 22 agent skills, 20 genre presets (jazz, trap, D&B, folk, etc.), real acoustic instruments via CDN samples. Apache 2.0, no API key, no per-render fee. https://github.com/Shepherd217/TuneFrames
 
 ---
 
-## The Story
+The agent music tool space is a wasteland. Suno API: login wall, rate limits, 101 open GitHub issues, burnt-out maintainer. ElevenLabs: sound effects, not music. Every wrapper still needs an API key and sends your audio somewhere.
 
-I kept asking my AI agent to add background music to the videos it was already making with Hyperframes. It couldn't. Every AI music tool required me to go to a website, log in, click buttons. The agent was helpless.
+I got sick of it. My agent could already make video with Hyperframes. It still couldn't make music. So I built TuneFrames.
 
-So I built TuneFrames.
+## The model
 
-The model is identical to what made Hyperframes work for video: write what you want in a format every developer already knows (HTML + Tone.js), run one CLI command, get a deterministic output file. The agent owns the whole pipeline. I just give it a prompt.
+Write compositions in the format every web developer already knows — HTML + Tone.js. Run one CLI command. Get a deterministic audio file. The agent owns the whole pipeline.
 
 ```bash
 npx tuneframes init my-track
 # agent writes composition.html with Tone.js
-npx tuneframes render composition.html --output track.mp3
+tuneframes render composition.html --output track.mp3
 ```
 
-The agent composes, renders, and delivers. No human in the loop.
+The code is the music. There's no black-box generative model, no "enhance my vibe" slider. Every note, every chord, every drum hit is explicit in the HTML. That's what makes it agent-native: the agent can read it, modify it, version-control it, and reproduce it byte-for-byte.
 
----
+## What's in v0.2.0
 
-## How It Works
+**Real instrument samples.** Tone.Sampler + the gleitz FluidR3_GM CDN (public domain). Acoustic grand piano, upright bass, string ensemble, brass section, nylon guitar, vibraphone, flute, choir. No installs beyond the npm package — samples load at render time.
 
-TuneFrames uses `Tone.Offline` — Tone.js's headless rendering context. No audio hardware, no browser audio context, no user gesture needed. Same composition in = same audio out, guaranteed.
-
-```
-HTML + Tone.js → Chromium (Tone.Offline) → WAV → FFmpeg → MP3/WAV
-```
-
-Seven built-in examples cover the range: a simple synth melody, a lo-fi chord progression with melody, driving techno, textural ambient, a layered orchestral arrangement, a solo piano piece, and a deep bass line.
-
-```html
-<div id="tuneframes" style="display:none">{"bpm":80,"duration":"10s"}</div>
-<script>
-  async function main() {
-    await Tone.start();
-    const synth = new Tone.Synth().toDestination();
-    synth.triggerAttackRelease('A3', '4n', 0);
-    synth.triggerAttackRelease('F3', '4n', Tone.Time('4n').toSeconds());
-    // ...
-  }
-</script>
+```js
+const piano = new Tone.Sampler({
+  urls: { A4: 'A4.mp3', C4: 'C4.mp3', 'F#4': 'Fs4.mp3' },
+  baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/'
+}).toDestination();
+await Tone.loaded();
+piano.triggerAttackRelease(['C4','E4','G4','B4'], '1n', 0);
 ```
 
-The metadata block tells TuneFrames the BPM and duration. Tone.js handles the rest.
+**22 agent skills, 20 genres.** Lo-fi, jazz, techno, ambient, trap, drum & bass, classical, folk, funk, hip-hop, R&B, house, chillwave, indie-pop, cinematic, future bass, orchestral, minimal, boss battle, downtempo. Each skill ships with BPM range, chord progressions, drum patterns, instrument configs, and a verified working example. Install them all:
 
----
-
-## Why Tone.js?
-
-Tone.js has **814,000 npm downloads per month**. It's the de facto standard for web audio. Every web developer who has ever wanted programmatic music already knows Tone.js — they just couldn't render it headlessly before.
-
-The agent-native music tool space is empty. Every "AI music" product is a Suno or Udio wrapper with a login wall and rate limits. TuneFrames is open-source, local, and runs from a CLI. The agent's API key, the agent's compute, the agent's output.
-
-Suno-api (the main open-source Suno wrapper) has 101 open issues and a burned-out maintainer. There's a reason: building music infrastructure is hard and the wrappers still need API keys. TuneFrames sidesteps all of that by using an established, dependency-free web standard.
-
----
-
-## Portability
-
-The key insight from Hyperframes: **agents need to be portable**. An agent that runs TuneFrames from my laptop runs the same TuneFrames from Claude Code, from OpenCLAW, from any agent platform. The composition is a single HTML file. The renderer is a single npm package. The output is deterministic.
-
-```
-Hyperframes: video for agents
-TuneFrames:  music for agents
-Same model. Same portability.
+```bash
+npx skills add shepherd217/tuneframes
 ```
 
-This is the MoltOS philosophy — agent identity and capabilities that move with the API key.
+**Parameterized audio surface.** The AI DJ example renders four different moods from a URL param — `?mood=chill`, `?mood=energetic`, `?mood=dark`, `?mood=happy`. Drop a single HTML file into any pipeline and get dynamically composed music out. This is the audio equivalent of what Hyperframes does for video: html-anything, now with sound.
 
----
+## Why Tone.js
 
-## Now It's Real
+814,000 npm downloads per month. It's the de facto standard for programmatic web audio. Every web developer who's ever wanted music in their app already knows it. TuneFrames doesn't teach you a new DSL — it makes Tone.js renderable from a CLI.
 
-TuneFrames is live on npm: **https://www.npmjs.com/package/tuneframes**
+The rendering trick is `Tone.Offline()` — a headless audio context that renders without hardware, without user gestures, without a browser tab. Same composition in, same audio out, every time. It's deterministic. Agents can cache by content hash, test on exact output, and reproduce builds.
 
-Seven examples included. Apache 2.0 license. No API key required. No per-render fees.
+## Compared to the alternatives
 
-GitHub: **https://github.com/Shepherd217/TuneFrames**
+- **Suno API**: per-render fees, rate limits, non-deterministic, login required, 101 open issues
+- **ElevenLabs sound effects**: not music, black-box, per-second billing
+- **TuneFrames**: $0 per render, open-source, deterministic, no account needed, the agent reads the source
 
-Built in one session because it needed to exist. Feedback welcome.
+The suno-api wrapper has existed for 2 years and still can't run headlessly without brittle browser automation hacks. TuneFrames just runs. `tuneframes render track.html --output track.mp3`.
+
+## Try it now
+
+```bash
+npx tuneframes init my-track
+cd my-track
+tuneframes render composition.html --output demo.mp3
+```
+
+Or install the skills and let your agent write it:
+
+```bash
+npx skills add shepherd217/tuneframes
+```
+
+GitHub: **https://github.com/Shepherd217/TuneFrames** — star it if you want more genres and instruments.
+
+npm: **https://www.npmjs.com/package/tuneframes**
+
+Apache 2.0. Code is music.

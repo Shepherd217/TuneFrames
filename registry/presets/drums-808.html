@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <!-- Classic trap 808 pattern — synthesis only, no CDN required -->
+  <!-- 2 bars at 140 BPM: 1 bar = 4 beats × (60/140)s ≈ 1.714s → 2 bars ≈ 3.43s -->
+  <div id="tuneframes" style="display:none">{"bpm":140,"duration":"7s"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+
+      // --- 808 Kick: pitched MembraneSynth with long pitch fall ---
+      const kick808 = new Tone.MembraneSynth({
+        pitchDecay:  0.5,
+        octaves:     8,
+        envelope: { attack: 0.001, decay: 0.8, sustain: 0, release: 0.4 }
+      }).toDestination();
+      kick808.volume.value = 2;
+
+      // --- Snare: layered noise (body) + click (transient) ---
+      const snareNoise = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.05 }
+      });
+      const snareFilter = new Tone.Filter({ frequency: 3500, type: 'highpass' }).toDestination();
+      snareNoise.connect(snareFilter);
+      snareNoise.volume.value = -4;
+
+      // --- Hi-hat: MetalSynth for crisp metallic transient ---
+      const hihat = new Tone.MetalSynth({
+        frequency:   400,
+        envelope:    { attack: 0.001, decay: 0.04, release: 0.01 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance:   4000,
+        octaves:     1.5
+      }).toDestination();
+      hihat.volume.value = -10;
+
+      // Open hi-hat: longer decay
+      const openHat = new Tone.MetalSynth({
+        frequency:   500,
+        envelope:    { attack: 0.001, decay: 0.3, release: 0.1 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance:   4000,
+        octaves:     1.5
+      }).toDestination();
+      openHat.volume.value = -14;
+
+      const beat = Tone.Time('4n').toSeconds(); // one beat in seconds at 140 BPM
+      const bar  = beat * 4;
+
+      // Render 2 bars of trap pattern
+      for (let b = 0; b < 2; b++) {
+        const o = b * bar;
+
+        // --- 808 kick: beats 1, 2.5, 3 (classic trap syncopation) ---
+        kick808.triggerAttackRelease('C1', '8n', o);
+        kick808.triggerAttackRelease('C1', '8n', o + beat * 1.5);
+        kick808.triggerAttackRelease('C1', '8n', o + beat * 2);
+
+        // --- Snare: beat 3 (half-time feel) ---
+        snareNoise.triggerAttackRelease('8n', o + beat * 2);
+
+        // --- Hi-hats: 16th notes throughout, open hat on beat 3-and ---
+        const sixteenth = beat / 4;
+        for (let s = 0; s < 16; s++) {
+          // Skip the snare slot (beat 3) on closed hats so open hat rings
+          if (s === 8) {
+            openHat.triggerAttackRelease('C5', '8n', o + s * sixteenth);
+          } else {
+            // Accent downbeats slightly
+            const vel = (s % 4 === 0) ? 1.0 : (s % 2 === 0 ? 0.6 : 0.35);
+            hihat.volume.value = -10 + (vel - 1) * 4;
+            hihat.triggerAttackRelease('C5', '32n', o + s * sixteenth);
+          }
+        }
+      }
+    }
+  </script>
+</body>
+</html>

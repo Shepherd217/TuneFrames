@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Jazz</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":132,"duration":"12s"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 132;
+
+      // ── Effects ─────────────────────────────────────────────────────────
+      const reverb = new Tone.Reverb({ decay: 1.6, preDelay: 0.01, wet: 0.28 }).toDestination();
+
+      // ── Piano — shell voicings (3rd + 7th on top) ───────────────────────
+      const piano = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.008, decay: 0.35, sustain: 0.5, release: 1.4 }
+      }).connect(reverb);
+      piano.volume.value = -10;
+
+      const bar = Tone.Time('1n').toSeconds();
+      const q   = Tone.Time('4n').toSeconds();
+
+      // ii–V–I–vi turnaround in C major (2 full passes = 8 bars)
+      // Bar layout: Dm7 | G7 | Cmaj7 | Am7 | repeat
+      const changes = [
+        { chord: ['D3','F3','C4'],       dur: '1n' }, // Dm7
+        { chord: ['G2','B2','F3'],       dur: '1n' }, // G7
+        { chord: ['C3','E3','B3'],       dur: '1n' }, // Cmaj7
+        { chord: ['A2','C3','G3','E4'],  dur: '1n' }, // Am7
+        { chord: ['D3','F3','C4'],       dur: '1n' }, // Dm7 (repeat)
+        { chord: ['Db3','F3','B3'],      dur: '1n' }, // Db7 (tritone sub)
+        { chord: ['C3','E3','B3','G4'],  dur: '2n' }, // Cmaj7
+        { chord: ['G2','B2','F3'],       dur: '2n' }, // G7 (turnaround)
+      ];
+      let t = 0;
+      changes.forEach(({ chord, dur }) => {
+        piano.triggerAttackRelease(chord, dur, t);
+        t += Tone.Time(dur).toSeconds();
+      });
+
+      // ── Walking bass ────────────────────────────────────────────────────
+      const bass = new Tone.Synth({
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.008, decay: 0.09, sustain: 0.55, release: 0.15 }
+      }).connect(reverb);
+      bass.volume.value = -6;
+
+      // 8-bar walking line (one note per beat = 32 quarter notes)
+      const walkLine = [
+        // Bar 1 Dm7
+        'D2','F2','A2','C3',
+        // Bar 2 G7
+        'G2','B2','D3','F3',
+        // Bar 3 Cmaj7
+        'C3','E2','G2','B2',
+        // Bar 4 Am7
+        'A2','C3','E3','G2',
+        // Bar 5 Dm7 (chromatic approach)
+        'D2','Eb2','E2','F2',
+        // Bar 6 Db7 (tritone)
+        'Db3','Ab2','F2','Eb2',
+        // Bar 7 Cmaj7
+        'C2','G2','E2','B2',
+        // Bar 8 G7
+        'G2','Ab2','A2','B2',
+      ];
+      walkLine.forEach((n, i) => bass.triggerAttackRelease(n, '4n', i * q));
+
+      // ── Ride cymbal (jazz swing pattern) ────────────────────────────────
+      const ride = new Tone.MetalSynth({
+        frequency: 240, harmonicity: 5.1, modulationIndex: 16,
+        resonance: 4000, octaves: 1.5,
+        envelope: { attack: 0.001, decay: 0.28, release: 0.08 }
+      }).connect(reverb);
+      ride.volume.value = -22;
+
+      // Swing triplet feel: beat 1, beat 2-and (triplet late), beat 3, beat 4-and
+      const swingLate = q * 0.67;
+      for (let b = 0; b < 8; b++) {
+        const base = b * bar;
+        ride.triggerAttackRelease('8n', base);
+        ride.triggerAttackRelease('8n', base + swingLate);
+        ride.triggerAttackRelease('8n', base + q * 2);
+        ride.triggerAttackRelease('8n', base + q * 2 + swingLate);
+      }
+
+      // ── Brush snare on 2 and 4 ──────────────────────────────────────────
+      const snareBp = new Tone.Filter(2800, 'bandpass').connect(reverb);
+      const snare   = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.004, decay: 0.09, sustain: 0, release: 0.04 }
+      }).connect(snareBp);
+      snare.volume.value = -26;
+
+      for (let b = 0; b < 8; b++) {
+        snare.triggerAttackRelease('8n', b * bar + q);       // beat 2
+        snare.triggerAttackRelease('8n', b * bar + q * 3);   // beat 4
+      }
+
+      // ── Bebop melody (enters bar 3) ─────────────────────────────────────
+      const melody = new Tone.Synth({
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.005, decay: 0.15, sustain: 0.4, release: 0.5 }
+      }).connect(reverb);
+      melody.volume.value = -12;
+
+      // Classic bebop phrase: arpeggiated chords + chromatic passing tones
+      const phrase = [
+        // Over Cmaj7 (bar 3)
+        { note: 'G4',  time: bar * 2,             dur: '8n' },
+        { note: 'E4',  time: bar * 2 + q * 0.5,  dur: '8n' },
+        { note: 'C5',  time: bar * 2 + q,         dur: '8n' },
+        { note: 'B4',  time: bar * 2 + q * 1.5,  dur: '8n' },
+        { note: 'A4',  time: bar * 2 + q * 2,     dur: '8n' },
+        { note: 'G4',  time: bar * 2 + q * 2.5,  dur: '8n' },
+        { note: 'F4',  time: bar * 2 + q * 3,     dur: '4n' },
+        // Over Am7 (bar 4)
+        { note: 'E4',  time: bar * 3 + q * 0.5,  dur: '8n' },
+        { note: 'C5',  time: bar * 3 + q,         dur: '8n' },
+        { note: 'B4',  time: bar * 3 + q * 1.5,  dur: '8n' },
+        { note: 'A4',  time: bar * 3 + q * 2,     dur: '4n' },
+        { note: 'G4',  time: bar * 3 + q * 3,     dur: '4n' },
+        // Over Dm7 again (bar 5)
+        { note: 'D5',  time: bar * 4,             dur: '8n' },
+        { note: 'C5',  time: bar * 4 + q * 0.5,  dur: '8n' },
+        { note: 'A4',  time: bar * 4 + q,         dur: '8n' },
+        { note: 'F4',  time: bar * 4 + q * 1.5,  dur: '8n' },
+        { note: 'E4',  time: bar * 4 + q * 2,     dur: '4n' },
+        { note: 'Eb4', time: bar * 4 + q * 3,     dur: '8n' }, // chromatic
+        { note: 'D4',  time: bar * 4 + q * 3.5,  dur: '8n' },
+        // Over Db7 (bar 6) — altered sound
+        { note: 'Ab4', time: bar * 5,             dur: '8n' },
+        { note: 'F4',  time: bar * 5 + q * 0.5,  dur: '8n' },
+        { note: 'Db4', time: bar * 5 + q,         dur: '4n' },
+        { note: 'C4',  time: bar * 5 + q * 2,     dur: '2n' }, // resolve to C
+      ];
+      phrase.forEach(({ note, time, dur }) => melody.triggerAttackRelease(note, dur, time));
+    }
+  </script>
+</body>
+</html>

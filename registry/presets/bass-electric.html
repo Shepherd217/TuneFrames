@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <!-- Walking bass line in C minor — acoustic_bass from gleitz CDN -->
+  <!-- 2 bars at 100 BPM: 1 beat = 0.6s, 8 quarter notes = 4.8s -->
+  <div id="tuneframes" style="display:none">{"bpm":100,"duration":"6s"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+
+      // Load acoustic bass samples from gleitz FluidR3_GM CDN
+      const bass = new Tone.Sampler({
+        urls: {
+          C1:  'C1.mp3',
+          Ds1: 'Ds1.mp3',
+          Fs1: 'Fs1.mp3',
+          A1:  'A1.mp3',
+          C2:  'C2.mp3',
+          Ds2: 'Ds2.mp3',
+          Fs2: 'Fs2.mp3',
+          A2:  'A2.mp3',
+          C3:  'C3.mp3',
+          Ds3: 'Ds3.mp3',
+          Fs3: 'Fs3.mp3',
+          A3:  'A3.mp3',
+          C4:  'C4.mp3'
+        },
+        baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_bass-mp3/'
+      });
+
+      // Subtle compression to even out the pluck dynamics
+      const comp = new Tone.Compressor({ threshold: -18, ratio: 3 }).toDestination();
+      bass.connect(comp);
+
+      // CRITICAL: wait for samples to load before scheduling any notes
+      await Tone.loaded();
+
+      const beat = Tone.Time('4n').toSeconds(); // 0.6s at 100 BPM
+      const dur  = '4n'; // each walking note lasts one quarter note
+
+      // Walking bass in C minor — 2 bars, 4 notes per bar
+      // Bar 1: root → approach from below → fifth → seventh (classic walking move)
+      // Bar 2: resolve back down with chromatic approach to the root
+      const line = [
+        // Bar 1 — Cm feel
+        'C2',  // root
+        'Eb2', // minor third
+        'G2',  // fifth
+        'Bb2', // minor seventh
+
+        // Bar 2 — Fm → G7 turnaround, walking back to root
+        'Ab2', // flat-six (Fm)
+        'G2',  // fifth (G dominant)
+        'F2',  // approach
+        'Eb2'  // land on minor third, implies return to Cm
+      ];
+
+      line.forEach((note, i) => {
+        bass.triggerAttackRelease(note, dur, i * beat);
+      });
+    }
+  </script>
+</body>
+</html>

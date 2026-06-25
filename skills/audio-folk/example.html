@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TuneFrames — Folk / Acoustic</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <!-- TuneFrames Metadata -->
+  <div id="tuneframes"
+    data-bpm="92"
+    data-duration="12s"
+    data-genre="folk"
+    data-key="G major"
+    style="display:none">
+  </div>
+
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 92;
+
+      // --- MASTER BUS ---
+      const masterLimiter = new Tone.Limiter(-1).toDestination();
+      const masterGain = new Tone.Gain(0.88).connect(masterLimiter);
+
+      // --- GUITAR — triangle pluck, very short decay, near-zero sustain ---
+      const guitarVerb = new Tone.Reverb({ decay: 1.4, wet: 0.18 }).connect(masterGain);
+      const guitarGain = new Tone.Gain(0.65).connect(guitarVerb);
+      const guitar = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "triangle" },
+        envelope: { attack: 0.003, decay: 0.22, sustain: 0.0, release: 0.5 },
+        volume: 0
+      }).connect(guitarGain);
+
+      // --- MELODY — slightly warmer pluck, higher register ---
+      const melodyGain = new Tone.Gain(0.45).connect(guitarVerb); // shares reverb
+      const melody = new Tone.Synth({
+        oscillator: { type: "triangle" },
+        envelope: { attack: 0.005, decay: 0.3, sustain: 0.15, release: 0.6 },
+        volume: 0
+      }).connect(melodyGain);
+
+      // --- BASS — warm sine, root notes only ---
+      const bassGain = new Tone.Gain(0.55).connect(masterGain);
+      const bass = new Tone.Synth({
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.04, decay: 0.15, sustain: 0.6, release: 0.4 },
+        volume: 0
+      }).connect(bassGain);
+
+      // --- BRUSHED SNARE — barely there, just rhythm shape ---
+      const brushVerb = new Tone.Reverb({ decay: 0.6, wet: 0.3 }).connect(masterGain);
+      const brushGain = new Tone.Gain(0.12).connect(brushVerb);
+      const brush = new Tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.01, decay: 0.08, sustain: 0, release: 0.04 }
+      }).connect(brushGain);
+
+      // --- TRAVIS PICKING — 4-bar G–C–D–Em loop ---
+      // Each bar: thumb on root/5th (low notes), finger on upper chord tones
+      // 8th note grid: bass note, chord tone, bass note, chord tone...
+      const pickingPattern = [
+        // Bar 0: G major — G2(thumb), B3(finger), D2(thumb-5th), G3(finger)...
+        ["0:0:0","G2"], ["0:0:2","B3"], ["0:1:0","D2"], ["0:1:2","G3"],
+        ["0:2:0","G2"], ["0:2:2","D3"], ["0:3:0","D2"], ["0:3:2","B3"],
+        // Bar 1: C major — C2(thumb), E3(finger), G2(thumb-5th), C3(finger)...
+        ["1:0:0","C2"], ["1:0:2","E3"], ["1:1:0","G2"], ["1:1:2","C3"],
+        ["1:2:0","C2"], ["1:2:2","G3"], ["1:3:0","G2"], ["1:3:2","E3"],
+        // Bar 2: D major — D2(thumb), F#3(finger), A2(thumb-5th), D3(finger)...
+        ["2:0:0","D2"], ["2:0:2","F#3"], ["2:1:0","A2"], ["2:1:2","D3"],
+        ["2:2:0","D2"], ["2:2:2","A3"],  ["2:3:0","A2"], ["2:3:2","F#3"],
+        // Bar 3: E minor — E2(thumb), G3(finger), B2(thumb-5th), E3(finger)...
+        ["3:0:0","E2"], ["3:0:2","G3"], ["3:1:0","B2"], ["3:1:2","E3"],
+        ["3:2:0","E2"], ["3:2:2","B3"], ["3:3:0","B2"], ["3:3:2","G3"],
+      ];
+      const pickPart = new Tone.Part((time, note) => {
+        guitar.triggerAttackRelease(note, "8n", time);
+      }, pickingPattern);
+      pickPart.loopEnd = "4m";
+      pickPart.loop = true;
+      pickPart.start(0);
+
+      // --- BASS — root on beat 1 of each bar, enters bar 2 ---
+      const bassPart = new Tone.Part((time, note) => {
+        bass.triggerAttackRelease(note, "2n", time);
+      }, [
+        ["0:0:0","G2"],
+        ["1:0:0","C2"],
+        ["2:0:0","D2"],
+        ["3:0:0","E2"],
+      ]);
+      bassPart.loopEnd = "4m";
+      bassPart.loop = true;
+      bassPart.start("1m"); // bass enters bar 2
+
+      // --- MELODY — simple diatonic line over the chord progression, enters bar 3 ---
+      const melodyNotes = [
+        // Over G: D4 – B3 – G3 – A3
+        { time: "0:0:0", note: "D4", dur: "4n" },
+        { time: "0:1:0", note: "B3", dur: "4n" },
+        { time: "0:2:0", note: "G3", dur: "4n" },
+        { time: "0:3:0", note: "A3", dur: "4n" },
+        // Over C: G3 – E3 – C4 – D4
+        { time: "1:0:0", note: "G3", dur: "4n" },
+        { time: "1:1:0", note: "E3", dur: "4n" },
+        { time: "1:2:0", note: "C4", dur: "2n" },
+        // Over D: D4 – F#3 – A3 – G3
+        { time: "2:0:0", note: "D4", dur: "4n" },
+        { time: "2:1:0", note: "F#3", dur: "4n" },
+        { time: "2:2:0", note: "A3", dur: "4n" },
+        { time: "2:3:0", note: "G3", dur: "4n" },
+        // Over Em: E3 – G3 – B3 – G3
+        { time: "3:0:0", note: "E3", dur: "4n" },
+        { time: "3:1:0", note: "G3", dur: "4n" },
+        { time: "3:2:0", note: "B3", dur: "2n" },
+      ];
+      const melodyPart = new Tone.Part((time, val) => {
+        melody.triggerAttackRelease(val.note, val.dur, time);
+      }, melodyNotes.map(({ time, note, dur }) => [time, { note, dur }]));
+      melodyPart.loopEnd = "4m";
+      melodyPart.loop = true;
+      melodyPart.start("2m"); // melody enters bar 3
+
+      // --- BRUSHED SNARE — beats 2 and 4, very quiet, enters bar 3 ---
+      const brushSeq = new Tone.Sequence((time, val) => {
+        if (val) brush.triggerAttackRelease("8n", time);
+      }, [null,null,null,null,1,null,null,null,null,null,null,null,1,null,null,null], "16n");
+      brushSeq.start("2m");
+
+      // --- START & STOP ---
+      Tone.Transport.start();
+      Tone.Transport.stop("+12");
+    }
+
+    main();
+  </script>
+</body>
+</html>

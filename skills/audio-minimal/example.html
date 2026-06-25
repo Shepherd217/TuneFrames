@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TuneFrames — Minimal Techno</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <!-- TuneFrames Metadata -->
+  <div id="tuneframes"
+    data-bpm="132"
+    data-duration="12s"
+    data-genre="minimal"
+    data-key="none"
+    style="display:none">
+  </div>
+
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 132;
+
+      // --- MASTER BUS ---
+      const masterLimiter = new Tone.Limiter(-2).toDestination();
+      const masterGain = new Tone.Gain(0.9).connect(masterLimiter);
+
+      // --- KICK CLICK — transient-forward, minimal sub ---
+      const kickGain = new Tone.Gain(0.8).connect(masterGain);
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.019,
+        octaves: 4,
+        envelope: { attack: 0.001, decay: 0.16, sustain: 0, release: 0.04 }
+      }).connect(kickGain);
+
+      // --- SUB TONE — sine, low-passed, felt not heard ---
+      const subGain = new Tone.Gain(0.55).connect(masterGain);
+      const subFilter = new Tone.Filter({ frequency: 110, type: "lowpass", Q: 1 }).connect(subGain);
+      const sub = new Tone.MonoSynth({
+        oscillator: { type: "sine" },
+        filter: { type: "lowpass", frequency: 200 },
+        filterEnvelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.3,
+                          baseFrequency: 80, octaves: 1 },
+        envelope: { attack: 0.008, decay: 0.22, sustain: 0.65, release: 0.25 },
+        volume: -4
+      }).connect(subFilter);
+
+      // --- HI-HAT — sparse, single hit per bar, humanized ---
+      const hatGain = new Tone.Gain(0.35).connect(masterGain);
+      const hat = new Tone.MetalSynth({
+        frequency: 385,
+        envelope: { attack: 0.001, decay: 0.062, release: 0.018 },
+        harmonicity: 3.1,
+        modulationIndex: 16,
+        resonance: 3100,
+        octaves: 1.2
+      }).connect(hatGain);
+
+      // --- TEXTURE — single sine note, massive reverb, triggered once ---
+      const textureVerb = new Tone.Reverb({ decay: 7.5, wet: 0.88 }).connect(masterGain);
+      const textureGain = new Tone.Gain(0.3).connect(textureVerb);
+      const texture = new Tone.Synth({
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.25, decay: 2.5, sustain: 0, release: 4.0 },
+        volume: -2
+      }).connect(textureGain);
+
+      // --- KICK SEQUENCE — 4-on-the-floor with subtle velocity drift ---
+      // The groove IS the velocity variation — never fully uniform
+      const kickVels = [0.88, 0.74, 0.84, 0.71, 0.90, 0.76, 0.82, 0.70,
+                        0.91, 0.73, 0.85, 0.72, 0.88, 0.75, 0.83, 0.74];
+      let kickStep = 0;
+      const kickSeq = new Tone.Sequence((time) => {
+        kick.triggerAttackRelease("C1", "8n", time, kickVels[kickStep % kickVels.length]);
+        kickStep++;
+      }, [1, null, null, null, 1, null, null, null,
+          1, null, null, null, 1, null, null, null], "16n");
+      kickSeq.start(0);
+
+      // --- SUB SEQUENCE — one hit per bar, beat 1 only ---
+      // Enters at bar 3 — two bars of kick-only silence first
+      const subSeq = new Tone.Sequence((time) => {
+        sub.triggerAttackRelease("C1", "4n", time);
+      }, [1, null, null, null, null, null, null, null,
+          null, null, null, null, null, null, null, null], "16n");
+      subSeq.start("2m");
+
+      // Very slow filter drift on sub — imperceptible but felt
+      const subDriftStart = Tone.Time("2m").toSeconds();
+      subFilter.frequency.setValueAtTime(100, subDriftStart);
+      subFilter.frequency.linearRampToValueAtTime(145, subDriftStart + 8);
+      subFilter.frequency.linearRampToValueAtTime(95, subDriftStart + 12);
+
+      // --- HI-HAT SEQUENCE — ONE hit per bar, on last 16th (step 15) ---
+      // Slight timing humanization = the Villalobos groove
+      // Enters at bar 5
+      const hatSeq = new Tone.Sequence((time) => {
+        const jitter = (Math.random() - 0.5) * 0.005; // ±5ms humanization
+        const vel = 0.48 + Math.random() * 0.16;      // velocity drift
+        hat.triggerAttackRelease("16n", time + jitter, vel);
+      }, [null, null, null, null, null, null, null, null,
+          null, null, null, null, null, null, 1, null], "16n");
+      hatSeq.start("4m");
+
+      // --- TEXTURE NOTE — single event, bar 7, D above middle ---
+      // Plays once. Never repeats. The reverb tail carries it.
+      texture.triggerAttackRelease("D4", "8n", "6m");
+
+      // --- STRUCTURAL EVENT: remove hat for exactly one bar (bar 9), then return ---
+      // Absence as rhythm — the most minimal move there is
+      Tone.Transport.scheduleOnce(() => { hatSeq.mute = true; }, "8m");
+      Tone.Transport.scheduleOnce(() => { hatSeq.mute = false; }, "9m");
+
+      // --- START & STOP ---
+      Tone.Transport.start();
+      Tone.Transport.stop("+12");
+    }
+
+    main();
+  </script>
+</body>
+</html>

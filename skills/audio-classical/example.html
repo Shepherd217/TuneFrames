@@ -1,0 +1,172 @@
+<div id="tuneframes" style="display:none">{"bpm":104,"duration":"12s"}</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<script>
+// TuneFrames — Classical Piano
+// C major, Allegro moderato (104 BPM)
+// Right hand: melodic line with ornamental turn
+// Left hand: Alberti bass (bass-upper-inner-upper pattern)
+// Harmony: I → V → vi → IV → V → I (complete progression)
+
+async function main() {
+  await Tone.start();
+
+  Tone.Transport.bpm.value = 104;
+
+  const beat    = 60 / 104;       // 0.577s per quarter note
+  const eighth  = beat / 2;       // 0.288s per eighth note
+  const sixteenth = beat / 4;     // 0.144s per sixteenth note
+
+  // ── Small room reverb — a piano in a parlour, not a concert hall ──────────
+  const reverb = new Tone.Reverb({ decay: 1.1, preDelay: 0.008, wet: 0.22 });
+  await reverb.generate();
+  reverb.toDestination();
+
+  // ── Right hand — melody voice, triangle wave ──────────────────────────────
+  const rh = new Tone.Synth({
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.006, decay: 0.22, sustain: 0.18, release: 1.4 },
+    volume: -4,
+  });
+  rh.connect(reverb);
+
+  // ── Left hand single notes (bass) — slightly softer, same timbre ─────────
+  const lhBass = new Tone.Synth({
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.008, decay: 0.35, sustain: 0.12, release: 1.0 },
+    volume: -10,
+  });
+  lhBass.connect(reverb);
+
+  // ── Left hand chord notes (inner voices of Alberti) ───────────────────────
+  const lhChord = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.008, decay: 0.3, sustain: 0.1, release: 0.9 },
+    volume: -13,
+  });
+  lhChord.connect(reverb);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Helper: schedule an Alberti bass pattern for one bar
+  // root = bass note (e.g. 'C3'), inner = e.g. 'E3', upper = e.g. 'G3'
+  // Pattern of 8 eighth notes: root upper inner upper root upper inner upper
+  // ─────────────────────────────────────────────────────────────────────────
+  function alberti(root, inner, upper, startTime) {
+    // 8 eighth notes per bar: alternating root / chord tones
+    const pattern = [root, upper, inner, upper, root, upper, inner, upper];
+    pattern.forEach((note, i) => {
+      const t = startTime + i * eighth;
+      Tone.Transport.scheduleOnce((time) => {
+        if (i % 2 === 0) {
+          // Bass note — use lhBass (single note, more resonant)
+          lhBass.triggerAttackRelease(note, '8n', time);
+        } else {
+          // Inner/upper chord tone — use lhChord
+          lhChord.triggerAttackRelease(note, '8n', time);
+        }
+      }, t);
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Harmony plan (one bar each, 4 beats = beat*4 per bar):
+  // Bar 1: I   — C major  (C3 E3 G3)
+  // Bar 2: V   — G major  (G2 B2 D3)
+  // Bar 3: vi  — A minor  (A2 C3 E3)
+  // Bar 4: IV  — F major  (F2 A2 C3)
+  // Bar 5: V   — G major  (G2 B2 D3)
+  // Bar 6: I   — C major  (C3 E3 G3)  — final resolution
+  // ─────────────────────────────────────────────────────────────────────────
+  const barLen = beat * 4;
+
+  alberti('C3', 'E3', 'G3', 0);              // I
+  alberti('G2', 'B2', 'D3', barLen);         // V
+  alberti('A2', 'C3', 'E3', barLen * 2);     // vi
+  alberti('F2', 'A2', 'C3', barLen * 3);     // IV
+  alberti('G2', 'B2', 'D3', barLen * 4);     // V
+  alberti('C3', 'E3', 'G3', barLen * 5);     // I (final)
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Right hand melody — stepwise, fits the chord above
+  // Phrase 1 (bars 1-2): C major scale ascending, quarter + eighth mix
+  // Phrase 2 (bars 3-4): descent with ornamental turn on E5
+  // Phrase 3 (bars 5-6): cadential figure, landing on C5
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Phrase 1: ascending C major scale with rhythmic variety
+  const phrase1 = [
+    { note: 'C5',  dur: '4n',  t: 0 },
+    { note: 'D5',  dur: '8n',  t: beat },
+    { note: 'E5',  dur: '8n',  t: beat + eighth },
+    { note: 'F5',  dur: '4n',  t: beat * 2 },
+    { note: 'G5',  dur: '4n',  t: beat * 3 },
+    // Bar 2: hold G5, then step up to A5
+    { note: 'G5',  dur: '8n',  t: barLen },
+    { note: 'A5',  dur: '8n',  t: barLen + eighth },
+    { note: 'G5',  dur: '4n',  t: barLen + beat },
+    { note: 'F5',  dur: '4n',  t: barLen + beat * 2 },
+    { note: 'E5',  dur: '4n',  t: barLen + beat * 3 },
+  ];
+
+  // Phrase 2: ornamental turn on E5 (E F E D E), then descent
+  // A "turn" = upper neighbour → main note → lower neighbour → main note
+  const turnStart = barLen * 2;
+  const turn = [
+    { note: 'F5',  dur: 'n16', t: turnStart },              // upper neighbour
+    { note: 'E5',  dur: 'n16', t: turnStart + sixteenth },  // main
+    { note: 'D5',  dur: 'n16', t: turnStart + sixteenth * 2 }, // lower
+    { note: 'E5',  dur: '8n',  t: turnStart + sixteenth * 3 }, // resolve to main
+  ];
+  const phrase2 = [
+    ...turn,
+    { note: 'D5',  dur: '4n',  t: turnStart + beat },
+    { note: 'C5',  dur: '4n',  t: turnStart + beat * 2 },
+    { note: 'B4',  dur: '4n',  t: turnStart + beat * 3 },
+    // Bar 4:
+    { note: 'A4',  dur: '4n',  t: barLen * 3 },
+    { note: 'G4',  dur: '8n',  t: barLen * 3 + beat },
+    { note: 'A4',  dur: '8n',  t: barLen * 3 + beat + eighth },
+    { note: 'C5',  dur: '2n',  t: barLen * 3 + beat * 2 },
+  ];
+
+  // Phrase 3: cadential figure V → I landing
+  const p3start = barLen * 4;
+  const phrase3 = [
+    { note: 'B4',  dur: '4n',  t: p3start },
+    { note: 'D5',  dur: '4n',  t: p3start + beat },
+    { note: 'G5',  dur: '4n',  t: p3start + beat * 2 },
+    { note: 'F5',  dur: '4n',  t: p3start + beat * 3 },
+    // Bar 6: resolution to I — long final note
+    { note: 'E5',  dur: '8n',  t: barLen * 5 },
+    { note: 'D5',  dur: '8n',  t: barLen * 5 + eighth },
+    { note: 'C5',  dur: '2n',  t: barLen * 5 + beat },   // lands on C5 — tonic, resolved
+  ];
+
+  // Schedule all right hand notes
+  [...phrase1, ...phrase2, ...phrase3].forEach(({ note, dur, t }) => {
+    if (t < 12) {
+      Tone.Transport.scheduleOnce((time) => {
+        rh.triggerAttackRelease(note, dur === 'n16' ? '16n' : dur, time);
+      }, t);
+    }
+  });
+
+  Tone.Transport.start();
+}
+
+window.renderComposition = async function(wavPath) {
+  let attempts = 0;
+  while (typeof Tone === 'undefined' && attempts < 50) {
+    await new Promise(r => setTimeout(r, 100));
+    attempts++;
+  }
+  if (typeof Tone === 'undefined') throw new Error('Tone not loaded');
+
+  const meta = JSON.parse(document.getElementById('tuneframes').textContent);
+  const durationSec = parseFloat(meta.duration) + 2.0;
+
+  const buffer = await Tone.Offline(async () => { await main(); }, durationSec, 1, 44100);
+  const wav = audioBufferToWav(buffer);
+  window.writeFile(wavPath, Array.from(new Uint8Array(wav)));
+  return wav.byteLength;
+};
+</script>

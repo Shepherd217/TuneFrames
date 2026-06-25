@@ -47,6 +47,21 @@ const HELPER_SCRIPT = `
     if (typeof Tone === 'undefined') throw new Error('Tone not loaded');
     if (typeof window.audioBufferToWav !== 'function') throw new Error('audioBufferToWav not injected');
 
+    // Wait for TUNEFRAMES_READY if composition uses Tone.Sampler / CDN samples
+    if ('TUNEFRAMES_READY' in window) {
+      const signal = window.TUNEFRAMES_READY;
+      if (signal && typeof signal.then === 'function') {
+        await signal;
+      } else {
+        let waited = 0;
+        while (!window.TUNEFRAMES_READY && waited < 120000) {
+          await new Promise(r => setTimeout(r, 200));
+          waited += 200;
+        }
+        if (!window.TUNEFRAMES_READY) throw new Error('TUNEFRAMES_READY timed out after 120s');
+      }
+    }
+
     let bpm = 120, duration = '4n';
     const metaEl = document.getElementById('tuneframes');
     if (metaEl) {
@@ -76,9 +91,11 @@ const HELPER_SCRIPT = `
 })();
 `;
 
-async function render(compositionPath, outputPath, format = 'mp3') {
+async function render(compositionPath, outputPath, format = 'mp3', timeout = 60000) {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
+
+  page.setDefaultTimeout(timeout + 60000);
 
   page.on('pageerror', err => console.error('BROWSER ERR:', err.message));
   page.on('console', msg => console.log('BROWSER:', msg.type(), msg.text()));
@@ -93,7 +110,7 @@ async function render(compositionPath, outputPath, format = 'mp3') {
   await page.addInitScript({ content: HELPER_SCRIPT });
 
   await page.goto(`file://${path.resolve(compositionPath)}`, {
-    waitUntil: 'domcontentloaded', timeout: 30000
+    waitUntil: 'domcontentloaded', timeout
   });
 
   // Wait for Tone.js to actually be available
@@ -101,6 +118,12 @@ async function render(compositionPath, outputPath, format = 'mp3') {
   
   // Also wait for our renderComposition to be defined
   await page.waitForFunction(() => typeof window.renderComposition === 'function', { timeout: 15000 });
+
+  // Check for TUNEFRAMES_READY signal (indicates Tone.Sampler / CDN sample usage)
+  const needsSampleWait = await page.evaluate(() => 'TUNEFRAMES_READY' in window);
+  if (needsSampleWait) {
+    console.log('Waiting for samples to load...');
+  }
 
   const wavPath = path.resolve(outputPath.replace(/\.[^.]+$/, '.wav'));
 

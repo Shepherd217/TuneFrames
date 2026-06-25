@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Lo-fi Hip Hop</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":80,"duration":"12s"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 80;
+
+      // ── Effects chain ───────────────────────────────────────────────────
+      const reverb   = new Tone.Reverb({ decay: 3.5, preDelay: 0.01, wet: 0.55 }).toDestination();
+      const lpFilter = new Tone.Filter(1800, 'lowpass').connect(reverb);
+      const tape     = new Tone.Distortion(0.04).connect(lpFilter);
+
+      // ── Soft pink noise (vinyl warmth) ──────────────────────────────────
+      const noiseLp   = new Tone.Filter(600, 'lowpass').connect(reverb);
+      const vinylNoise = new Tone.Noise('pink').connect(noiseLp);
+      vinylNoise.volume.value = -42;
+      vinylNoise.start(0).stop('+12');
+
+      // ── Rhodes-style keys ───────────────────────────────────────────────
+      const keys = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.05, decay: 0.3, sustain: 0.7, release: 2.0 }
+      }).connect(tape);
+      keys.volume.value = -10;
+
+      // Am7 – Fmaj7 – Cmaj7 – G7
+      const chords = [
+        ['A3','C4','E4','G4'],
+        ['F3','A3','C4','E4'],
+        ['C3','E3','G3','B3'],
+        ['G3','B3','D4','F4'],
+      ];
+
+      // 2 beats per chord at 80 BPM = 1.5s per chord
+      const step = Tone.Time('2n').toSeconds();
+      chords.forEach((ch, i) => keys.triggerAttackRelease(ch, '2n', i * step));
+      // Second pass — loop the chords again from 6s
+      chords.forEach((ch, i) => keys.triggerAttackRelease(ch, '2n', 6 + i * step));
+
+      // ── Walking bass ────────────────────────────────────────────────────
+      const bassFilter = new Tone.Filter(600, 'lowpass').connect(reverb);
+      const bass = new Tone.Synth({
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.02, decay: 0.12, sustain: 0.5, release: 0.5 }
+      }).connect(bassFilter);
+      bass.volume.value = -6;
+
+      // Root + passing tone on each chord (quarter notes)
+      const bassLines = [
+        ['A2','C3'],
+        ['F2','G2'],
+        ['C2','E2'],
+        ['G2','A2'],
+      ];
+      bassLines.forEach(([root, pass], i) => {
+        bass.triggerAttackRelease(root, '4n', i * step);
+        bass.triggerAttackRelease(pass, '4n', i * step + step * 0.5);
+      });
+      bassLines.forEach(([root, pass], i) => {
+        bass.triggerAttackRelease(root, '4n', 6 + i * step);
+        bass.triggerAttackRelease(pass, '4n', 6 + i * step + step * 0.5);
+      });
+
+      // ── Muffled kick ────────────────────────────────────────────────────
+      const kickLp = new Tone.Filter(200, 'lowpass').connect(reverb);
+      const kick   = new Tone.MembraneSynth({
+        pitchDecay: 0.05, octaves: 5,
+        envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.4 }
+      }).connect(kickLp);
+      kick.volume.value = -14;
+
+      const beat = 60 / 80; // 0.75s
+      // Kick on beats 1 and 3 of each bar (2 bars = 12 beats total)
+      for (let bar = 0; bar < 4; bar++) {
+        kick.triggerAttackRelease('C1', '8n', bar * beat * 4);
+        kick.triggerAttackRelease('C1', '8n', bar * beat * 4 + beat * 2);
+      }
+
+      // ── Snare (soft) ────────────────────────────────────────────────────
+      const snare = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.05 }
+      }).connect(new Tone.Filter(3000, 'bandpass').connect(reverb));
+      snare.volume.value = -22;
+
+      // Snare on beats 2 and 4
+      for (let bar = 0; bar < 4; bar++) {
+        snare.triggerAttackRelease('8n', bar * beat * 4 + beat);
+        snare.triggerAttackRelease('8n', bar * beat * 4 + beat * 3);
+      }
+
+      // ── Soft hi-hat (swung 8ths) ────────────────────────────────────────
+      const hat = new Tone.MetalSynth({
+        frequency: 400,
+        envelope: { attack: 0.001, decay: 0.06, release: 0.01 },
+        harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5
+      }).connect(reverb);
+      hat.volume.value = -28;
+
+      // Swung 8th notes: on beat, then slightly late (lazy swing)
+      for (let i = 0; i < 16; i++) {
+        const swing = (i % 2 === 1) ? 0.05 : 0; // slight swing delay on offbeats
+        hat.triggerAttackRelease('16n', i * beat * 0.5 + swing);
+      }
+
+      // ── Melody fragment (enters bar 3, ~4.5s) ───────────────────────────
+      const melodyDelay = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.25, wet: 0.3 }).connect(reverb);
+      const melody = new Tone.Synth({
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.02, decay: 0.2, sustain: 0.3, release: 0.8 }
+      }).connect(melodyDelay);
+      melody.volume.value = -16;
+
+      // Simple pentatonic phrase over bars 3–4 (starting at 4.5s)
+      const phrase = [
+        { note: 'E5', time: 4.5, dur: '8n' },
+        { note: 'C5', time: 5.0, dur: '8n' },
+        { note: 'A4', time: 5.5, dur: '4n' },
+        { note: 'G4', time: 6.5, dur: '8n' },
+        { note: 'A4', time: 7.0, dur: '4n' },
+        { note: 'E5', time: 7.75, dur: '8n' },
+        { note: 'C5', time: 8.25, dur: '2n' },
+      ];
+      phrase.forEach(({ note, time, dur }) => melody.triggerAttackRelease(note, dur, time));
+    }
+  </script>
+</body>
+</html>

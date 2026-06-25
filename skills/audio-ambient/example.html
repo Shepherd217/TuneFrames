@@ -1,0 +1,110 @@
+<div id="tuneframes" style="display:none">{"bpm":60,"duration":"14s"}</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<script>
+// TuneFrames — Ambient (Brian Eno style)
+// D minor drone pads, massive reverb, slow evolving pitch movement
+// No percussion. Everything breathes.
+
+async function main() {
+  await Tone.start();
+
+  Tone.Transport.bpm.value = 60;
+
+  // ── Effects chain ──────────────────────────────────────────────────────────
+  const reverb = new Tone.Reverb({ decay: 10, preDelay: 0.05, wet: 0.88 });
+  await reverb.generate();
+  reverb.toDestination();
+
+  const delay = new Tone.FeedbackDelay({ delayTime: 0.5, feedback: 0.42, wet: 0.32 });
+  delay.connect(reverb);
+
+  // ── Primary drone — sine wave, very slow attack ────────────────────────────
+  const drone = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'sine' },
+    envelope: { attack: 4.5, decay: 2.0, sustain: 0.9, release: 7.0 },
+    volume: -8,
+  });
+  drone.connect(delay);
+
+  // ── Shimmer layer — triangle, even slower, upper register ─────────────────
+  const shimmer = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 5.0, decay: 1.5, sustain: 0.75, release: 6.0 },
+    volume: -17,
+  });
+  shimmer.connect(reverb);
+
+  // ── Sub drone — anchors the bass register ─────────────────────────────────
+  const sub = new Tone.Synth({
+    oscillator: { type: 'sine' },
+    envelope: { attack: 6.0, decay: 3.0, sustain: 0.9, release: 8.0 },
+    volume: -13,
+  });
+  sub.connect(reverb);
+
+  // ── Schedule drone tones — D minor: D F A C ───────────────────────────────
+  // Staggered so they don't all attack at once — the overlapping sustains
+  // create the "chord cloud" that defines ambient music
+
+  // Root drone: D2 enters immediately, fades in over 4.5 seconds
+  Tone.Transport.scheduleOnce((t) => {
+    drone.triggerAttackRelease(['D3', 'A3'], '8n', t);
+  }, 0);
+
+  // Fifth enters at 1.5s — builds on the drone
+  Tone.Transport.scheduleOnce((t) => {
+    drone.triggerAttackRelease(['F3', 'C4'], '8n', t);
+  }, 1.5);
+
+  // Color tone — minor 7th adds bittersweet quality
+  Tone.Transport.scheduleOnce((t) => {
+    drone.triggerAttackRelease(['E3', 'G3'], '8n', t);
+  }, 3.5);
+
+  // Second wave — new chord cloud begins overlapping the first
+  Tone.Transport.scheduleOnce((t) => {
+    drone.triggerAttackRelease(['D3', 'F3'], '8n', t);
+  }, 6.0);
+
+  Tone.Transport.scheduleOnce((t) => {
+    drone.triggerAttackRelease(['A3', 'C4'], '8n', t);
+  }, 8.0);
+
+  // ── Shimmer tones — upper harmonics ───────────────────────────────────────
+  Tone.Transport.scheduleOnce((t) => {
+    shimmer.triggerAttackRelease(['F5', 'A5'], '8n', t);
+  }, 2.0);
+
+  Tone.Transport.scheduleOnce((t) => {
+    shimmer.triggerAttackRelease(['D5', 'C5'], '8n', t);
+  }, 5.5);
+
+  Tone.Transport.scheduleOnce((t) => {
+    shimmer.triggerAttackRelease(['E5', 'G5'], '8n', t);
+  }, 9.0);
+
+  // ── Sub bass — single low D, fades in and holds ───────────────────────────
+  Tone.Transport.scheduleOnce((t) => {
+    sub.triggerAttackRelease('D2', '8n', t);
+  }, 0.5);
+
+  Tone.Transport.start();
+}
+
+window.renderComposition = async function(wavPath) {
+  let attempts = 0;
+  while (typeof Tone === 'undefined' && attempts < 50) {
+    await new Promise(r => setTimeout(r, 100));
+    attempts++;
+  }
+  if (typeof Tone === 'undefined') throw new Error('Tone not loaded');
+
+  const meta = JSON.parse(document.getElementById('tuneframes').textContent);
+  const durationSec = parseFloat(meta.duration) + 1.0;
+
+  const buffer = await Tone.Offline(async () => { await main(); }, durationSec, 1, 44100);
+  const wav = audioBufferToWav(buffer);
+  window.writeFile(wavPath, Array.from(new Uint8Array(wav)));
+  return wav.byteLength;
+};
+</script>

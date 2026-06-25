@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Funk</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":104,"duration":"12s"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 104;
+
+      const s16 = Tone.Time('16n').toSeconds(); // ~0.144s
+      const q   = Tone.Time('4n').toSeconds();  // ~0.577s
+      const bar = Tone.Time('1n').toSeconds();  // ~2.308s
+
+      // ── Bus compressor (the funk glue) ──────────────────────────────────
+      const comp = new Tone.Compressor({ threshold: -16, ratio: 4, attack: 0.003, release: 0.12 }).toDestination();
+      const room = new Tone.Reverb({ decay: 0.6, wet: 0.12 }).connect(comp);
+
+      // ── Slap bass ───────────────────────────────────────────────────────
+      const bassFilter = new Tone.Filter(800, 'lowpass').connect(comp);
+      const bass = new Tone.Synth({
+        oscillator: { type: 'square' },
+        envelope: { attack: 0.001, decay: 0.09, sustain: 0.0, release: 0.04 }
+      }).connect(bassFilter);
+      bass.volume.value = -4;
+
+      // One-bar groove in E — repeated 5 times
+      const bassPattern = [
+        { note: 'E2',  t: 0      },
+        { note: 'E2',  t: s16*2  },
+        { note: 'G2',  t: s16*3  },
+        { note: 'E2',  t: s16*4  },
+        { note: 'A2',  t: s16*6  },
+        { note: 'E2',  t: s16*8  },
+        { note: 'D2',  t: s16*10 },
+        { note: 'E2',  t: s16*12 },
+        { note: 'Gb2', t: s16*14 },
+      ];
+      for (let rep = 0; rep < 5; rep++) {
+        bassPattern.forEach(({ note, t }) => bass.triggerAttackRelease(note, '16n', rep * bar + t));
+      }
+
+      // ── Rhythm guitar chank (bandpass, hits on upbeats) ─────────────────
+      const guitFilter = new Tone.Filter(2200, 'bandpass').connect(room);
+      const guitar = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.003, decay: 0.1, sustain: 0.0, release: 0.06 }
+      }).connect(guitFilter);
+      guitar.volume.value = -14;
+
+      // Chank on "and" of 2 (s16*9) and "and" of 4 (s16*13) — classic funk chop
+      const chankTimes = [s16 * 9, s16 * 13];
+      for (let rep = 0; rep < 5; rep++) {
+        chankTimes.forEach(t => {
+          guitar.triggerAttackRelease(['E4','G4','B4'], '16n', rep * bar + t);
+        });
+      }
+
+      // ── Brass stabs (upbeat, punchy) ────────────────────────────────────
+      const brassFilter = new Tone.Filter(4000, 'lowpass').connect(room);
+      const brass = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.006, decay: 0.13, sustain: 0.0, release: 0.07 }
+      }).connect(brassFilter);
+      brass.volume.value = -10;
+
+      // Stabs enter on bar 2 — same upbeat timing as guitar chank
+      const stabTimes = [s16 * 9, s16 * 13, s16 * 9 + bar, s16 * 13 + bar];
+      stabTimes.forEach(t => brass.triggerAttackRelease(['E4','G4','B4'], '16n', bar + t - bar));
+
+      for (let rep = 1; rep < 5; rep++) {
+        [s16 * 9, s16 * 13].forEach(t => {
+          brass.triggerAttackRelease(['E4','G4','B4'], '16n', rep * bar + t);
+          // Second stab chord a beat later for call-and-response
+          brass.triggerAttackRelease(['D4','F4','A4'], '16n', rep * bar + t + s16 * 2);
+        });
+      }
+
+      // ── Kick drum ───────────────────────────────────────────────────────
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.04, octaves: 6,
+        envelope: { attack: 0.001, decay: 0.22, sustain: 0, release: 0.08 }
+      }).connect(comp);
+      kick.volume.value = -8;
+
+      // Kick pattern: beat 1, then syncopated 16th before beat 3 and on the "a" of 3
+      for (let rep = 0; rep < 5; rep++) {
+        kick.triggerAttackRelease('C1', '8n', rep * bar);           // beat 1
+        kick.triggerAttackRelease('C1', '8n', rep * bar + s16 * 7); // "and-a" of 2
+        kick.triggerAttackRelease('C1', '8n', rep * bar + s16 * 10); // "and" of 3
+      }
+
+      // ── Snare on 2 and 4 (with ghost notes) ────────────────────────────
+      const snareBp  = new Tone.Filter(3200, 'bandpass').connect(room);
+      const snare    = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.11, sustain: 0, release: 0.04 }
+      }).connect(snareBp);
+      snare.volume.value = -12;
+
+      const ghostSnare = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 }
+      }).connect(snareBp);
+      ghostSnare.volume.value = -26; // quiet ghosts
+
+      for (let rep = 0; rep < 5; rep++) {
+        snare.triggerAttackRelease('8n', rep * bar + q);         // beat 2
+        snare.triggerAttackRelease('8n', rep * bar + q * 3);     // beat 4
+        // Ghost notes around beat 3
+        ghostSnare.triggerAttackRelease('16n', rep * bar + s16 * 9);
+        ghostSnare.triggerAttackRelease('16n', rep * bar + s16 * 11);
+      }
+
+      // ── 16th hi-hats ───────────────────────────────────────────────────
+      const hat = new Tone.MetalSynth({
+        frequency: 600, harmonicity: 5.1, modulationIndex: 32,
+        resonance: 4000, octaves: 1.5,
+        envelope: { attack: 0.001, decay: 0.028, release: 0.008 }
+      }).connect(comp);
+      hat.volume.value = -19;
+
+      // Full 16th grid, slight accent on quarter notes
+      for (let rep = 0; rep < 5; rep++) {
+        for (let i = 0; i < 16; i++) {
+          hat.volume.value = (i % 4 === 0) ? -15 : -21; // accent on beats
+          hat.triggerAttackRelease('32n', rep * bar + i * s16);
+        }
+      }
+
+      // ── Open hi-hat accent on beat 4 of every other bar ────────────────
+      const openHat = new Tone.MetalSynth({
+        frequency: 400, harmonicity: 3.1, modulationIndex: 12,
+        resonance: 2000, octaves: 1.0,
+        envelope: { attack: 0.001, decay: 0.22, release: 0.08 }
+      }).connect(room);
+      openHat.volume.value = -18;
+
+      for (let rep = 1; rep < 5; rep += 2) {
+        openHat.triggerAttackRelease('8n', rep * bar + q * 3);
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <!-- Am - F - C - G chord progression, 4 chords × 2s = 8s -->
+  <div id="tuneframes" style="display:none">{"bpm":120,"duration":"9s"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+
+      // Load acoustic grand piano samples from gleitz FluidR3_GM CDN
+      const piano = new Tone.Sampler({
+        urls: {
+          A0:  'A0.mp3',
+          C2:  'C2.mp3',
+          Ds2: 'Ds2.mp3',
+          Fs2: 'Fs2.mp3',
+          A2:  'A2.mp3',
+          C3:  'C3.mp3',
+          Ds3: 'Ds3.mp3',
+          Fs3: 'Fs3.mp3',
+          A3:  'A3.mp3',
+          C4:  'C4.mp3',
+          Ds4: 'Ds4.mp3',
+          Fs4: 'Fs4.mp3',
+          A4:  'A4.mp3',
+          C5:  'C5.mp3',
+          Ds5: 'Ds5.mp3',
+          Fs5: 'Fs5.mp3',
+          A5:  'A5.mp3',
+          C6:  'C6.mp3',
+          A6:  'A6.mp3',
+          C7:  'C7.mp3',
+          C8:  'C8.mp3'
+        },
+        baseUrl: 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/'
+      });
+
+      // Light reverb for hall ambience
+      const reverb = new Tone.Reverb({ decay: 2.5, wet: 0.25 }).toDestination();
+      piano.connect(reverb);
+
+      // CRITICAL: wait for all samples to load before scheduling any notes
+      await Tone.loaded();
+
+      // Am - F - C - G, 2 seconds each, 8 seconds total
+      // Voicings are close-position triads with a bass note for warmth
+      const chords = [
+        { notes: ['A2', 'E3', 'A3', 'C4', 'E4'], label: 'Am' },
+        { notes: ['F2', 'C3', 'F3', 'A3', 'C4'], label: 'F'  },
+        { notes: ['C3', 'G3', 'C4', 'E4', 'G4'], label: 'C'  },
+        { notes: ['G2', 'D3', 'G3', 'B3', 'D4'], label: 'G'  }
+      ];
+
+      const chordDuration = 2; // seconds per chord
+      const noteDuration  = '1n'; // sustain each chord for a whole note
+
+      chords.forEach((chord, i) => {
+        const t = i * chordDuration;
+        // Arpeggiate the bass note very slightly ahead of the chord for a natural feel
+        piano.triggerAttackRelease(chord.notes[0], noteDuration, t);
+        piano.triggerAttackRelease(chord.notes.slice(1), noteDuration, t + 0.04);
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Cinematic Score</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":72,"duration":"15s"}</div>
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 72;
+
+      const bar = Tone.Time('1n').toSeconds(); // ~3.33s per bar at 72 BPM
+      const q   = Tone.Time('4n').toSeconds(); // ~0.83s per beat
+
+      // ── Reverb halls ─────────────────────────────────────────────────────
+      const hall  = new Tone.Reverb({ decay: 7, preDelay: 0.06, wet: 0.65 }).toDestination();
+      const room  = new Tone.Reverb({ decay: 3, preDelay: 0.01, wet: 0.35 }).toDestination();
+
+      // ── Choir pad (enters immediately, very soft) ─────────────────────────
+      const choir = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sine' },
+        envelope: { attack: 2.8, decay: 0.4, sustain: 0.85, release: 6.0 }
+      }).connect(hall);
+      choir.volume.value = -22;
+
+      // Dm open fifth — ethereal, thin, creates space
+      choir.triggerAttackRelease(['D3','A3'], '2n', 0);
+
+      // ── Strings — slow attack swell ──────────────────────────────────────
+      const strings = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 2.0, decay: 0.5, sustain: 0.85, release: 5.0 }
+      }).connect(hall);
+      strings.volume.value = -16;
+
+      // Dm – Bb – F – C (the cinematic minor-to-relative-major arc)
+      const prog = [
+        ['D3','F3','A3','D4'],    // Dm  (bar 1)
+        ['Bb2','D3','F3','Bb3'],  // Bb  (bar 2)
+        ['F2','C3','F3','A3'],    // F   (bar 3)
+        ['C3','G3','C4','E4'],    // C   (bar 4)
+      ];
+      prog.forEach((ch, i) => strings.triggerAttackRelease(ch, '1n', i * bar));
+
+      // ── Cello ostinato (enters bar 2 — adds forward motion) ──────────────
+      const cello = new Tone.Synth({
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.12, decay: 0.2, sustain: 0.7, release: 0.8 }
+      }).connect(hall);
+      cello.volume.value = -18;
+
+      // D–A–D pattern driving through bars 2–4
+      const ostinato = ['D3','A3','D3','A3','D3','A3','D3','F3'];
+      ostinato.forEach((n, i) => cello.triggerAttackRelease(n, '8n', bar + i * (q * 0.5)));
+
+      const ostinato2 = ['Bb2','F3','Bb2','F3','Bb2','F3','C3','G3'];
+      ostinato2.forEach((n, i) => cello.triggerAttackRelease(n, '8n', bar * 2 + i * (q * 0.5)));
+
+      const ostinato3 = ['F2','C3','F3','C3','F2','C3','G2','C3'];
+      ostinato3.forEach((n, i) => cello.triggerAttackRelease(n, '8n', bar * 3 + i * (q * 0.5)));
+
+      // ── Low piano (enters bar 1, punctuates downbeats) ───────────────────
+      const piano = new Tone.Synth({
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.01, decay: 1.2, sustain: 0.1, release: 2.0 }
+      }).connect(room);
+      piano.volume.value = -14;
+
+      piano.triggerAttackRelease('D2', '2n', 0);
+      piano.triggerAttackRelease('Bb1', '2n', bar);
+      piano.triggerAttackRelease('F1',  '2n', bar * 2);
+      piano.triggerAttackRelease('C2',  '2n', bar * 3);
+
+      // ── Yearning solo melody (enters bar 2, high register) ───────────────
+      const solo = new Tone.Synth({
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.35, decay: 0.3, sustain: 0.85, release: 2.5 }
+      }).connect(hall);
+      solo.volume.value = -14;
+
+      // Morricone-style descending phrase: D5–C5–Bb4–A4–F4–A4
+      const soloPhrase = [
+        { note: 'D5',  time: bar * 1.5,       dur: '4n' },
+        { note: 'C5',  time: bar * 1.5 + q,   dur: '4n' },
+        { note: 'Bb4', time: bar * 1.5 + q*2, dur: '2n' },
+        { note: 'A4',  time: bar * 2.5,        dur: '4n' },
+        { note: 'F4',  time: bar * 2.5 + q,   dur: '4n' },
+        { note: 'A4',  time: bar * 2.5 + q*2, dur: '4n' },
+        { note: 'D5',  time: bar * 3,          dur: '2n.' },
+        { note: 'C5',  time: bar * 3.75,       dur: '4n' },
+      ];
+      soloPhrase.forEach(({ note, time, dur }) => solo.triggerAttackRelease(note, dur, time));
+
+      // ── Brass swell (enters bar 3 — the climax) ──────────────────────────
+      const brass = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.5, decay: 0.3, sustain: 0.85, release: 3.0 }
+      }).connect(hall);
+      brass.volume.value = -20;
+
+      brass.triggerAttackRelease(['F3','A3','C4','F4'], '2n', bar * 2);
+      brass.triggerAttackRelease(['C3','G3','C4','E4'], '1n', bar * 3);
+
+      // ── Timpani — dramatic hits on bars 3 and 4 ──────────────────────────
+      const timp = new Tone.MembraneSynth({
+        pitchDecay: 0.1, octaves: 6,
+        envelope: { attack: 0.001, decay: 1.5, sustain: 0, release: 2.5 }
+      }).connect(hall);
+      timp.volume.value = -8;
+
+      timp.triggerAttackRelease('F1', '4n', bar * 2);
+      timp.triggerAttackRelease('D1', '4n', bar * 3);
+      timp.triggerAttackRelease('C1', '4n', bar * 3 + q * 2);
+    }
+  </script>
+</body>
+</html>

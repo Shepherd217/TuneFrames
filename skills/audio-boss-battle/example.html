@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TuneFrames — Boss Battle</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <!-- TuneFrames Metadata -->
+  <div id="tuneframes"
+    data-bpm="165"
+    data-duration="12s"
+    data-genre="boss-battle"
+    data-key="D minor"
+    style="display:none">
+  </div>
+
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 165;
+
+      // --- MASTER BUS ---
+      const masterLimiter = new Tone.Limiter(-1).toDestination();
+      const masterGain = new Tone.Gain(0.8).connect(masterLimiter);
+
+      // --- BASS OSTINATO — driving 16th notes, sawtooth growl ---
+      const bassVerb = new Tone.Reverb({ decay: 0.4, wet: 0.1 }).connect(masterGain);
+      const bassGain = new Tone.Gain(0.75).connect(bassVerb);
+      const bass = new Tone.MonoSynth({
+        oscillator: { type: "sawtooth" },
+        filter: { Q: 3, type: "lowpass", rolloff: -24 },
+        filterEnvelope: {
+          attack: 0.001, decay: 0.1, sustain: 0.5, release: 0.2,
+          baseFrequency: 80, octaves: 2
+        },
+        envelope: { attack: 0.001, decay: 0.1, sustain: 0.7, release: 0.1 },
+        volume: -2
+      }).connect(bassGain);
+
+      // --- POWER CHORD STABS — square wave, very punchy ---
+      const stabReverb = new Tone.Reverb({ decay: 0.6, wet: 0.22 }).connect(masterGain);
+      const stabGain = new Tone.Gain(0.5).connect(stabReverb);
+      const stabs = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "square" },
+        envelope: { attack: 0.001, decay: 0.12, sustain: 0.0, release: 0.08 },
+        volume: 0
+      }).connect(stabGain);
+
+      // --- BRASS MELODY — AMSynth: sawtooth + sine AM = heroic blat ---
+      const brassVerb = new Tone.Reverb({ decay: 1.5, wet: 0.3 }).connect(masterGain);
+      const brassGain = new Tone.Gain(0.55).connect(brassVerb);
+      const brass = new Tone.AMSynth({
+        oscillator: { type: "sawtooth" },
+        envelope: { attack: 0.04, decay: 0.1, sustain: 0.85, release: 0.4 },
+        modulation: { type: "sine" },
+        modulationEnvelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 },
+        harmonicity: 1,
+        volume: 0
+      }).connect(brassGain);
+
+      // --- TIMPANI — low-tuned MembraneSynth, long decay ---
+      const timpsVerb = new Tone.Reverb({ decay: 1.2, wet: 0.35 }).connect(masterGain);
+      const timpsGain = new Tone.Gain(0.65).connect(timpsVerb);
+      const timps = new Tone.MembraneSynth({
+        pitchDecay: 0.2,
+        octaves: 4,
+        envelope: { attack: 0.001, decay: 0.6, sustain: 0, release: 0.3 }
+      }).connect(timpsGain);
+
+      // --- KICK — hard, driving ---
+      const kickGain = new Tone.Gain(0.9).connect(masterGain);
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.06,
+        octaves: 8,
+        envelope: { attack: 0.001, decay: 0.28, sustain: 0, release: 0.08 }
+      }).connect(kickGain);
+
+      // --- SNARE — sharp crack ---
+      const snareVerb = new Tone.Reverb({ decay: 0.5, wet: 0.3 }).connect(masterGain);
+      const snareGain = new Tone.Gain(0.48).connect(snareVerb);
+      const snare = new Tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.04 }
+      }).connect(snareGain);
+
+      // --- COUNTER ARPEGGIO — fast ascending D minor runs ---
+      const arpVerb = new Tone.Reverb({ decay: 0.8, wet: 0.25 }).connect(masterGain);
+      const arpGain = new Tone.Gain(0.3).connect(arpVerb);
+      const arpSynth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "sawtooth4" },
+        envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.1 },
+        volume: 0
+      }).connect(arpGain);
+
+      // --- PATTERNS ---
+
+      // Bass ostinato: 16th-note D minor figure with neighbor movement (from bar 1)
+      const bassLine = [
+        "D2","D2","F2","D2", "G2","D2","F2","E2",
+        "D2","D2","F2","D2", "G2","F2","Eb2","D2"
+      ];
+      let bassStep = 0;
+      const bassSeq = new Tone.Sequence((time) => {
+        bass.triggerAttackRelease(bassLine[bassStep % bassLine.length], "16n", time);
+        bassStep++;
+      }, new Array(16).fill(1), "16n");
+      bassSeq.start(0);
+
+      // Timpani: D1 on bar 1, A1 on beat 3, D1 on bar 3 — enters bar 2
+      const timpsHits = [
+        { time: "1m",     note: "D1" },
+        { time: "1m:2",   note: "A1" },
+        { time: "2m",     note: "D1" },
+        { time: "2m:2",   note: "A1" },
+        { time: "3m",     note: "D1" },
+        { time: "3m:2",   note: "A1" },
+        { time: "4m",     note: "D1" },
+        { time: "5m",     note: "D1" },
+        { time: "6m",     note: "D1" },
+        { time: "7m",     note: "D1" },
+      ];
+      timpsHits.forEach(({ time, note }) => {
+        timps.triggerAttackRelease(note, "4n", time);
+      });
+
+      // Power chord stabs: cycling Dm–F–G–Bb on offbeats, enters bar 3
+      const stabChords = [["D3","A3"], ["F3","C4"], ["G3","D4"], ["Bb3","F4"]];
+      let stabStep = 0;
+      const stabSeq = new Tone.Sequence((time, val) => {
+        if (val) {
+          stabs.triggerAttackRelease(stabChords[stabStep % stabChords.length], "16n", time);
+          stabStep++;
+        }
+      }, [null,null,1,null,null,null,null,null,null,null,1,null,null,null,null,null], "16n");
+      stabSeq.start("2m");
+
+      // Kick: driving 8th notes, enters bar 3
+      const kickSeq = new Tone.Sequence((time, val) => {
+        if (val) kick.triggerAttackRelease("C1", "8n", time);
+      }, ["C1",null,null,null,"C1",null,null,null,"C1",null,null,null,"C1",null,null,null], "16n");
+      kickSeq.start("2m");
+
+      // Snare: beats 2 and 4, enters bar 3
+      const snareSeq = new Tone.Sequence((time, val) => {
+        if (val) snare.triggerAttackRelease("8n", time);
+      }, [null,null,null,null,1,null,null,null,null,null,null,null,1,null,null,null], "16n");
+      snareSeq.start("2m");
+
+      // Counter arpeggio: D minor ascending 16th runs (D F A C, repeat), enters bar 5
+      const arpNotes = ["D4","F4","A4","C5","A4","F4","D4","F4",
+                        "D4","F4","A4","C5","D5","C5","A4","F4"];
+      let arpStep = 0;
+      const arpSeq = new Tone.Sequence((time) => {
+        arpSynth.triggerAttackRelease(arpNotes[arpStep % arpNotes.length], "16n", time);
+        arpStep++;
+      }, new Array(16).fill(1), "16n");
+      arpSeq.start("4m");
+
+      // Heroic brass melody: D minor scale, ascending then descending, enters bar 5
+      const melodyNotes = [
+        // Bar 4: D ascending triad + 7th
+        { time: "4:0:0", note: "D4", dur: "4n" },
+        { time: "4:1:0", note: "F4", dur: "4n" },
+        { time: "4:2:0", note: "A4", dur: "4n" },
+        { time: "4:3:0", note: "C5", dur: "4n" },
+        // Bar 5: descend
+        { time: "5:0:0", note: "Bb4", dur: "4n" },
+        { time: "5:1:0", note: "A4",  dur: "4n" },
+        { time: "5:2:0", note: "G4",  dur: "2n" },
+        // Bar 6: climb again, higher
+        { time: "6:0:0", note: "A4",  dur: "4n" },
+        { time: "6:1:0", note: "C5",  dur: "4n" },
+        { time: "6:2:0", note: "D5",  dur: "4n" },
+        { time: "6:3:0", note: "F5",  dur: "4n" },
+        // Bar 7: final resolve
+        { time: "7:0:0", note: "Eb5", dur: "4n" },
+        { time: "7:1:0", note: "D5",  dur: "4n" },
+        { time: "7:2:0", note: "A4",  dur: "2n" },
+      ];
+      melodyNotes.forEach(({ time, note, dur }) => {
+        brass.triggerAttackRelease(note, dur, time);
+      });
+
+      // --- START & STOP ---
+      Tone.Transport.start();
+      Tone.Transport.stop("+12");
+    }
+
+    main();
+  </script>
+</body>
+</html>

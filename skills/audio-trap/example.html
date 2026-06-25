@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TuneFrames — Trap</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <!-- TuneFrames Metadata -->
+  <div id="tuneframes"
+    data-bpm="140"
+    data-duration="12s"
+    data-genre="trap"
+    data-key="C minor"
+    style="display:none">
+  </div>
+
+  <script>
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 140;
+
+      // --- MASTER BUS ---
+      const masterLimiter = new Tone.Limiter(-1).toDestination();
+      const masterGain = new Tone.Gain(0.85).connect(masterLimiter);
+
+      // --- 808 SUB — MembraneSynth with long pitchDecay for the signature glide ---
+      const subSaturate = new Tone.Distortion({ distortion: 0.12, wet: 0.25 }).connect(masterGain);
+      const subGain = new Tone.Gain(1.1).connect(subSaturate);
+      const sub = new Tone.MembraneSynth({
+        pitchDecay: 0.48,   // the 808 "fall" — longer = more dramatic
+        octaves: 3,          // pitch range of the glide
+        envelope: { attack: 0.001, decay: 1.1, sustain: 0, release: 0.5 }
+      }).connect(subGain);
+
+      // --- SNARE — punchy white noise, dry ---
+      const snareVerb = new Tone.Reverb({ decay: 0.7, wet: 0.18 }).connect(masterGain);
+      const snareGain = new Tone.Gain(0.7).connect(snareVerb);
+      const snare = new Tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.001, decay: 0.16, sustain: 0, release: 0.05 }
+      }).connect(snareGain);
+
+      // --- HI-HAT — very tight, high frequency ---
+      const hatGain = new Tone.Gain(0.42).connect(masterGain);
+      const hat = new Tone.MetalSynth({
+        frequency: 820,
+        envelope: { attack: 0.001, decay: 0.028, release: 0.008 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 5200,
+        octaves: 2
+      }).connect(hatGain);
+
+      // --- STRINGS — atmospheric PolySynth, heavy reverb ---
+      const stringsVerb = new Tone.Reverb({ decay: 4.5, wet: 0.65 }).connect(masterGain);
+      const stringsGain = new Tone.Gain(0.5).connect(stringsVerb);
+      const strings = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: "sawtooth4" },
+        envelope: { attack: 0.5, decay: 1.2, sustain: 0.65, release: 2.0 },
+        volume: -2
+      }).connect(stringsGain);
+
+      // --- 808 PATTERN — half-time feel, beat 1 of every bar ---
+      // Pattern: hit on beat 1, ghost on beat 3.5
+      const subPattern = new Tone.Sequence((time, note) => {
+        if (note === "C2") {
+          sub.triggerAttackRelease("C2", "2n", time);
+        } else if (note === "G1") {
+          sub.triggerAttackRelease("G1", "4n", time);
+        }
+      }, ["C2", null, null, null, null, null, "G1", null,
+          "C2", null, null, null, null, null, null, null], "16n");
+      subPattern.start(0);
+
+      // --- SNARE PATTERN — half-time: beat 3 of the bar (step 8 of 16) ---
+      const snareSeq = new Tone.Sequence((time, val) => {
+        if (val) snare.triggerAttackRelease("16n", time);
+      }, [null, null, null, null, null, null, null, null,
+          1, null, null, null, null, null, null, null], "16n");
+      snareSeq.start(0);
+
+      // --- HI-HAT ROLLS — the trap signature ---
+      // 32nd-note grid: velocity variation creates rolls and accents
+      // Pattern evolves every bar: starts sparse, builds to dense rolls
+      let hatStep = 0;
+
+      // Bar 1-2 velocity map: sparse 16th pattern (every 2 32nds)
+      const hatBar1 = [
+        0.8, 0,   0.4, 0,   0.8, 0,   0.4, 0,
+        0.8, 0,   0.4, 0,   0.8, 0.3, 0.9, 0.3
+      ];
+      // Bar 3-4: 16th rolls with triplet accent flurry
+      const hatBar2 = [
+        0.8, 0.3, 0.6, 0.2, 0.8, 0.3, 0.5, 0.2,
+        0.7, 0.3, 0.6, 0.2, 0.9, 0.5, 0.8, 0.5
+      ];
+      // Bar 5-6: dense 32nd roll building to drop
+      const hatBar3 = [
+        0.6, 0.3, 0.7, 0.3, 0.6, 0.4, 0.8, 0.3,
+        0.6, 0.4, 0.7, 0.5, 0.8, 0.6, 0.9, 0.7
+      ];
+
+      // Merge all bars into one 96-step (6-bar) loop for 32nds at 140bpm
+      const fullHatPattern = [...hatBar1, ...hatBar1, ...hatBar2, ...hatBar2, ...hatBar3, ...hatBar3];
+
+      const hatSeq = new Tone.Sequence((time, vel) => {
+        if (vel > 0) hat.triggerAttackRelease("32n", time, vel);
+      }, fullHatPattern, "32n");
+      hatSeq.start(0);
+
+      // --- STRINGS — atmospheric minor chord, enters at bar 3 ---
+      // Cm: C3-Eb3-G3 + high B4 tension note
+      const stringNotes = ["C3", "Eb3", "G3", "Bb3"];
+      strings.triggerAttackRelease(stringNotes, "2m", "2m");
+      // Resolution chord at bar 5
+      strings.triggerAttackRelease(["Ab2", "C3", "Eb3", "G3"], "2m", "4m");
+      strings.triggerAttackRelease(["C3", "Eb3", "G3", "Bb3"], "2m", "6m");
+
+      // --- START & STOP ---
+      Tone.Transport.start();
+      Tone.Transport.stop("+12");
+    }
+
+    main();
+  </script>
+</body>
+</html>
