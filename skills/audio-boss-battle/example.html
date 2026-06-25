@@ -102,17 +102,18 @@
       bassSeq.start(0);
 
       // Timpani: D1 on bar 1, A1 on beat 3, D1 on bar 3 — enters bar 2
+      // Use bars:beats:sixteenths (0-indexed) to avoid mixed-notation parsing errors.
       const timpsHits = [
-        { time: "1m",     note: "D1" },
-        { time: "1m:2",   note: "A1" },
-        { time: "2m",     note: "D1" },
-        { time: "2m:2",   note: "A1" },
-        { time: "3m",     note: "D1" },
-        { time: "3m:2",   note: "A1" },
-        { time: "4m",     note: "D1" },
-        { time: "5m",     note: "D1" },
-        { time: "6m",     note: "D1" },
-        { time: "7m",     note: "D1" },
+        { time: "1:0:0",  note: "D1" },
+        { time: "1:2:0",  note: "A1" },
+        { time: "2:0:0",  note: "D1" },
+        { time: "2:2:0",  note: "A1" },
+        { time: "3:0:0",  note: "D1" },
+        { time: "3:2:0",  note: "A1" },
+        { time: "4:0:0",  note: "D1" },
+        { time: "5:0:0",  note: "D1" },
+        { time: "6:0:0",  note: "D1" },
+        { time: "7:0:0",  note: "D1" },
       ];
       timpsHits.forEach(({ time, note }) => {
         timps.triggerAttackRelease(note, "4n", time);

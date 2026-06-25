@@ -37,6 +37,60 @@ const HELPER_SCRIPT = `
 
   window.audioBufferToWav = audioBufferToWav;
 
+  // Tone.js CDN bundle defines exports as non-writable, non-configurable getter
+  // properties (rollup live-binding pattern). Direct assignment and Object.defineProperty
+  // both fail to override them. Proxy on window.Tone is the only reliable intercept.
+  //
+  // AudioWorklet effects (Freeverb, BitCrusher, Chebyshev) fail in headless offline
+  // rendering because worklet modules cannot load. The Proxy returns unity-gain
+  // passthroughs for those classes when inside a Tone.Offline() call (_inOff flag).
+  //
+  // Reverb tracking is also done in the Proxy get trap (rather than Tone.Reverb = ...)
+  // because Tone.Reverb is a non-configurable no-setter accessor — setting it would
+  // violate Proxy invariants. Instances pushed to window._tfRev; awaited after main().
+  window._patchToneWorklets = function() {
+    if (typeof Tone === 'undefined' || window._tonePatched) return;
+    window._tonePatched = true;
+
+    const _orig = window.Tone;
+    const _origOffline = _orig.Offline;
+
+    const _mkPass = () => class extends _orig.Gain {
+      constructor() { super(1); }
+      // Reverb-compat stubs: some skills call await reverb.generate() or await reverb.ready.
+      generate() { return Promise.resolve(this); }
+      get ready() { return Promise.resolve(this); }
+    };
+    // Reverb included: its IR generation calls the module-internal Offline() which
+    // creates a nested offline context and corrupts the outer timeline. Passthrough
+    // eliminates the nested context entirely. Audio flows through; dry-signal-only
+    // is acceptable for a headless render test.
+    const _fx = { Freeverb: _mkPass(), BitCrusher: _mkPass(), Chebyshev: _mkPass(), Reverb: _mkPass() };
+
+    let _inOff = false;
+
+    const _wOffline = async function(cb, ...args) {
+      _inOff = true;
+      try { return await _origOffline(cb, ...args); }
+      finally { _inOff = false; }
+    };
+
+    window.Tone = new Proxy(_orig, {
+      get(t, p) {
+        if (p === 'Offline') return _wOffline;
+        if (_inOff && p in _fx) return _fx[p];
+        return t[p];
+      },
+      set(t, p, v) {
+        // Return false for non-configurable no-setter accessors to honor Proxy invariant.
+        const d = Object.getOwnPropertyDescriptor(t, p);
+        if (d && !d.configurable && d.get && !d.set) return false;
+        try { t[p] = v; } catch(e) {}
+        return true;
+      }
+    });
+  };
+
   window.renderComposition = async function(wavPath) {
     // Wait for Tone.js to be ready
     let attempts = 0;
@@ -46,6 +100,8 @@ const HELPER_SCRIPT = `
     }
     if (typeof Tone === 'undefined') throw new Error('Tone not loaded');
     if (typeof window.audioBufferToWav !== 'function') throw new Error('audioBufferToWav not injected');
+
+    window._patchToneWorklets();
 
     // Wait for TUNEFRAMES_READY if composition uses Tone.Sampler / CDN samples
     if ('TUNEFRAMES_READY' in window) {
@@ -62,21 +118,62 @@ const HELPER_SCRIPT = `
       }
     }
 
-    let bpm = 120, duration = '4n';
+    let bpm = 120, duration = '12s';
     const metaEl = document.getElementById('tuneframes');
     if (metaEl) {
+      // Support both JSON textContent and data-* attributes
       try {
-        const meta = JSON.parse(metaEl.textContent);
-        bpm = meta.bpm || 120;
-        duration = meta.duration || '4n';
+        const txt = metaEl.textContent.trim();
+        if (txt) {
+          const meta = JSON.parse(txt);
+          bpm = meta.bpm || 120;
+          duration = meta.duration || '12s';
+        }
       } catch(e) {}
+      if (metaEl.dataset.bpm) bpm = parseInt(metaEl.dataset.bpm, 10) || bpm;
+      if (metaEl.dataset.duration) duration = metaEl.dataset.duration || duration;
     }
 
     const durationSec = Math.max(Tone.Time(duration).toSeconds() + 0.5, 2);
     console.log('TuneFrames: rendering', durationSec, 's at BPM', bpm);
 
     const audioBuffer = await Tone.Offline(async () => {
+      // Fix: MetalSynth.triggerAttackRelease calls triggerAttack(computedTime, velocity)
+      // but triggerAttack(note, time, velocity) treats first arg as note and second as time,
+      // so toSeconds(velocity=undefined) = 0 for every trigger. Replace TAR to call
+      // _triggerEnvelopeAttack/_triggerEnvelopeRelease directly with the correct time.
+      // Also bumps same-time triggers by 0.1ms to prevent StateTimeline ordering errors.
+      if (typeof Tone !== 'undefined' && Tone.MetalSynth) {
+        Tone.MetalSynth.prototype.triggerAttackRelease = function(duration, time, velocity) {
+          const rawT = (time === undefined || time === null || +time <= 0) ? 0.05 : +time;
+          const vel = velocity !== undefined ? velocity : 1;
+          const dur = Tone.Time(duration).toSeconds();
+          let safeT = rawT;
+          try {
+            if (this._oscillators && this._oscillators[0] && this._oscillators[0]._state) {
+              const tl = this._oscillators[0]._state._timeline;
+              if (tl && tl.length > 0 && safeT <= tl[tl.length - 1].time) {
+                safeT = tl[tl.length - 1].time + 0.0001;
+              }
+            }
+          } catch(e) {}
+          this._triggerEnvelopeAttack(safeT, vel);
+          // Release envelope only; stopping oscillators adds StateTimeline stop events
+          // that block same-period re-triggers on rapid percussion patterns.
+          if (this.envelope && typeof this.envelope.triggerRelease === 'function') {
+            this.envelope.triggerRelease(safeT + dur);
+          }
+          return this;
+        };
+      }
+
       if (typeof main === 'function') await main();
+
+      // Auto-start Transport so Tone.Sequence / Tone.Part patterns play.
+      // Skills that already call Transport.start() inside main() are unaffected.
+      if (typeof Tone !== 'undefined' && Tone.Transport && Tone.Transport.state !== 'started') {
+        Tone.Transport.start(0);
+      }
     }, durationSec, 1, 44100, bpm);
 
     console.log('TuneFrames: buffer ready', audioBuffer.duration, audioBuffer.length);
@@ -115,7 +212,14 @@ async function render(compositionPath, outputPath, format = 'mp3', timeout = 600
 
   // Wait for Tone.js to actually be available
   await page.waitForFunction(() => typeof Tone !== 'undefined', { timeout: 15000 });
-  
+
+  // Apply global patches before any renderComposition runs.
+  // This covers skills that define their own renderComposition (e.g. audio-downtempo).
+  // Apply global patches before any renderComposition runs.
+  await page.evaluate(() => {
+    if (typeof window._patchToneWorklets === 'function') window._patchToneWorklets();
+  });
+
   // Also wait for our renderComposition to be defined
   await page.waitForFunction(() => typeof window.renderComposition === 'function', { timeout: 15000 });
 
