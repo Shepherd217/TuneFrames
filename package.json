@@ -4,7 +4,8 @@
   "description": "Agent-native music generation. Write Tone.js, render to audio.",
   "main": "src/cli.js",
   "bin": {
-    "tuneframes": "src/cli.js"
+    "tuneframes": "src/cli.js",
+    "tuneframes-mcp": "src/mcp.mjs"
   },
   "scripts": {
     "render": "node src/cli.js render",
@@ -25,18 +26,22 @@
     "web-audio",
     "soundfont",
     "sampler",
-    "instruments"
+    "instruments",
+    "mcp",
+    "model-context-protocol",
+    "ai-agent"
   ],
   "author": "Nathan Shepherd",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Shepherd217/TuneFrames"
+    "url": "git+https://github.com/Shepherd217/TuneFrames.git"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
     "playwright": "^1.44.0"
   }
 }
