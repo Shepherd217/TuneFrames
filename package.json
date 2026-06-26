@@ -1,6 +1,6 @@
 {
   "name": "tuneframes",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Agent-native music generation. Write Tone.js, render to audio.",
   "main": "src/cli.js",
   "bin": {
