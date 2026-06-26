@@ -250,8 +250,140 @@ async function main() {
       break;
     }
 
+    case 'install': {
+      const [packName] = args;
+      const DRUMS_BASE     = 'https://dave4mpls.github.io/midi-js-soundfonts-with-drums/FluidR3_GM/drums-mp3/';
+      const GLEITZ_PIANO   = 'https://gleitz.github.io/midi-js-soundfonts/MusyngKite/acoustic_grand_piano-mp3/';
+      const GLEITZ_BASS    = 'https://gleitz.github.io/midi-js-soundfonts/MusyngKite/electric_bass_finger-mp3/';
+      const GLEITZ_STRINGS = 'https://gleitz.github.io/midi-js-soundfonts/MusyngKite/string_ensemble_1-mp3/';
+      const SALAMANDER_BASE = 'https://tonejs.github.io/audio/salamander/';
+
+      if (!packName || packName === 'list') {
+        console.log('Available sample packs:');
+        console.log('  drums          Standard kit (kick, snare, hat, crash) via gleitz/dave4mpls CDN');
+        console.log('  piano          Acoustic grand piano via gleitz CDN (MusyngKite)');
+        console.log('  electric-piano Rhodes-style Salamander samples');
+        console.log('  bass           Electric bass (fingered) via gleitz CDN');
+        console.log('  strings        String ensemble via gleitz CDN');
+        console.log('\nRun: tuneframes install <pack>');
+        break;
+      }
+
+      switch (packName) {
+        case 'drums': {
+          console.log('drums (gleitz/dave4mpls CDN)\n');
+          console.log(`CDN base URL:\n  ${DRUMS_BASE}\n`);
+          console.log('Filename convention: sharps use "s" suffix (Fs2.mp3 for F#2); flats use "b" (Bb2.mp3)\n');
+          console.log('Trigger map:');
+          console.log('  C2  -> Kick drum');
+          console.log('  D2  -> Snare');
+          console.log('  F#2 -> Hi-hat (closed)  [file: Fs2.mp3]');
+          console.log('  Bb2 -> Hi-hat (open)    [file: Bb2.mp3]');
+          console.log('  Db3 -> Crash            [file: Db3.mp3]');
+          console.log('  Eb3 -> Ride             [file: Eb3.mp3]');
+          console.log('\nCopy-paste usage:');
+          console.log(`  const drums = new Tone.Sampler({`);
+          console.log(`    urls: {`);
+          console.log(`      'C2': 'C2.mp3', 'D2': 'D2.mp3', 'F#2': 'Fs2.mp3',`);
+          console.log(`      'Bb2': 'Bb2.mp3', 'Db3': 'Db3.mp3', 'Eb3': 'Eb3.mp3',`);
+          console.log(`    },`);
+          console.log(`    baseUrl: '${DRUMS_BASE}',`);
+          console.log(`  }).toDestination();`);
+          console.log(`  window.TUNEFRAMES_READY = Tone.loaded();`);
+          console.log('\nTip: Use window.TUNEFRAMES_READY = Tone.loaded() so the renderer waits for samples to load.');
+          break;
+        }
+        case 'piano': {
+          console.log('piano (gleitz CDN — MusyngKite acoustic_grand_piano)\n');
+          console.log(`CDN base URL:\n  ${GLEITZ_PIANO}\n`);
+          console.log('Filename convention: flat notation only (Ab4.mp3, not G#4.mp3); Tone.Sampler accepts either as keys\n');
+          console.log('Copy-paste usage:');
+          console.log(`  const piano = new Tone.Sampler({`);
+          console.log(`    urls: {`);
+          console.log(`      'A0':'A0.mp3', 'C1':'C1.mp3', 'Eb1':'Eb1.mp3', 'Gb1':'Gb1.mp3',`);
+          console.log(`      'A1':'A1.mp3', 'C2':'C2.mp3', 'Eb2':'Eb2.mp3', 'Gb2':'Gb2.mp3',`);
+          console.log(`      'A2':'A2.mp3', 'C3':'C3.mp3', 'Eb3':'Eb3.mp3', 'Gb3':'Gb3.mp3',`);
+          console.log(`      'A3':'A3.mp3', 'C4':'C4.mp3', 'Eb4':'Eb4.mp3', 'Gb4':'Gb4.mp3',`);
+          console.log(`      'A4':'A4.mp3', 'C5':'C5.mp3', 'Eb5':'Eb5.mp3', 'Gb5':'Gb5.mp3',`);
+          console.log(`    },`);
+          console.log(`    baseUrl: '${GLEITZ_PIANO}',`);
+          console.log(`  }).toDestination();`);
+          console.log(`  window.TUNEFRAMES_READY = Tone.loaded();`);
+          console.log('\nTip: Use window.TUNEFRAMES_READY = Tone.loaded() so the renderer waits for samples to load.');
+          break;
+        }
+        case 'electric-piano': {
+          console.log('electric-piano (Salamander Grand Piano)\n');
+          console.log(`CDN base URL:\n  ${SALAMANDER_BASE}\n`);
+          console.log('Filename convention: sharps use "s" (Fs4.mp3 for F#4); 20 samples span A0 to C7\n');
+          console.log('Sample filenames: A0 C1 Fs1 A1 C2 Fs2 A2 C3 Fs3 A3 C4 Fs4 A4 C5 Fs5 A5 C6 Fs6 A6 C7\n');
+          console.log('Copy-paste usage (pre-fetch pattern — avoids Tone.loaded() race condition):\n');
+          console.log(`  const FILES = {`);
+          console.log(`    'A0':'A0.mp3', 'C1':'C1.mp3', 'F#1':'Fs1.mp3', 'A1':'A1.mp3',`);
+          console.log(`    'C2':'C2.mp3', 'F#2':'Fs2.mp3','A2':'A2.mp3',  'C3':'C3.mp3',`);
+          console.log(`    'F#3':'Fs3.mp3','A3':'A3.mp3', 'C4':'C4.mp3',  'F#4':'Fs4.mp3',`);
+          console.log(`    'A4':'A4.mp3',  'C5':'C5.mp3', 'F#5':'Fs5.mp3','A5':'A5.mp3',`);
+          console.log(`    'C6':'C6.mp3',  'F#6':'Fs6.mp3','A6':'A6.mp3', 'C7':'C7.mp3',`);
+          console.log(`  };`);
+          console.log(`  const ctx = new AudioContext();`);
+          console.log(`  window.TUNEFRAMES_READY = (async () => {`);
+          console.log(`    window._sal = {};`);
+          console.log(`    await Promise.all(Object.entries(FILES).map(async ([note, file]) => {`);
+          console.log(`      const ab = await (await fetch('${SALAMANDER_BASE}' + file)).arrayBuffer();`);
+          console.log(`      window._sal[note] = await ctx.decodeAudioData(ab);`);
+          console.log(`    }));`);
+          console.log(`  })();\n`);
+          console.log(`  // Inside main():`);
+          console.log(`  const urls = {};`);
+          console.log(`  for (const [note, buf] of Object.entries(window._sal)) {`);
+          console.log(`    urls[note] = new Tone.ToneAudioBuffer(buf);`);
+          console.log(`  }`);
+          console.log(`  const piano = new Tone.Sampler({ urls }).toDestination();`);
+          console.log('\nTip: Use window.TUNEFRAMES_READY = Tone.loaded() so the renderer waits for samples to load.');
+          break;
+        }
+        case 'bass': {
+          console.log('bass (gleitz CDN — MusyngKite electric_bass_finger)\n');
+          console.log(`CDN base URL:\n  ${GLEITZ_BASS}\n`);
+          console.log('Filename convention: flat notation only (Bb2.mp3, not A#2.mp3); Tone.Sampler accepts either as keys\n');
+          console.log('Copy-paste usage:');
+          console.log(`  const bass = new Tone.Sampler({`);
+          console.log(`    urls: {`);
+          console.log(`      'E1':'E1.mp3', 'A1':'A1.mp3', 'D2':'D2.mp3', 'G2':'G2.mp3',`);
+          console.log(`      'B2':'B2.mp3', 'E3':'E3.mp3', 'A3':'A3.mp3', 'D4':'D4.mp3',`);
+          console.log(`    },`);
+          console.log(`    baseUrl: '${GLEITZ_BASS}',`);
+          console.log(`  }).toDestination();`);
+          console.log(`  window.TUNEFRAMES_READY = Tone.loaded();`);
+          console.log('\nTip: Use window.TUNEFRAMES_READY = Tone.loaded() so the renderer waits for samples to load.');
+          break;
+        }
+        case 'strings': {
+          console.log('strings (gleitz CDN — MusyngKite string_ensemble_1)\n');
+          console.log(`CDN base URL:\n  ${GLEITZ_STRINGS}\n`);
+          console.log('Filename convention: flat notation only (Ab4.mp3, not G#4.mp3); Tone.Sampler accepts either as keys\n');
+          console.log('Copy-paste usage:');
+          console.log(`  const strings = new Tone.Sampler({`);
+          console.log(`    urls: {`);
+          console.log(`      'C3':'C3.mp3', 'Eb3':'Eb3.mp3', 'Gb3':'Gb3.mp3', 'Bb3':'Bb3.mp3',`);
+          console.log(`      'C4':'C4.mp3', 'Eb4':'Eb4.mp3', 'Gb4':'Gb4.mp3', 'Bb4':'Bb4.mp3',`);
+          console.log(`      'C5':'C5.mp3', 'Eb5':'Eb5.mp3', 'Gb5':'Gb5.mp3',`);
+          console.log(`    },`);
+          console.log(`    baseUrl: '${GLEITZ_STRINGS}',`);
+          console.log(`  }).toDestination();`);
+          console.log(`  window.TUNEFRAMES_READY = Tone.loaded();`);
+          console.log('\nTip: Use window.TUNEFRAMES_READY = Tone.loaded() so the renderer waits for samples to load.');
+          break;
+        }
+        default:
+          console.error(`Unknown pack: "${packName}"\nAvailable packs: drums, piano, electric-piano, bass, strings\n\nRun: tuneframes install list`);
+          process.exit(1);
+      }
+      break;
+    }
+
     default:
-      console.log(`TuneFrames CLI\n\nCommands:\n  tuneframes render <file.html>  Render composition to MP3\n  tuneframes init <name>         Initialize new project\n  tuneframes preview <file.html> Open in browser\n  tuneframes validate <file.html> Validate composition (headless test render)\n  tuneframes lint <file.html>    Lint composition (static HTML analysis)\n  tuneframes add <preset>         Add preset to composition.html\n  tuneframes instruments          List gleitz CDN instruments for Tone.Sampler\n\nPresets: ${PRESETS.join(', ')}`);
+      console.log(`TuneFrames CLI\n\nCommands:\n  tuneframes render <file.html>  Render composition to MP3\n  tuneframes init <name>         Initialize new project\n  tuneframes preview <file.html> Open in browser\n  tuneframes validate <file.html> Validate composition (headless test render)\n  tuneframes lint <file.html>    Lint composition (static HTML analysis)\n  tuneframes add <preset>         Add preset to composition.html\n  tuneframes instruments          List gleitz CDN instruments for Tone.Sampler\n  tuneframes install <pack>       Discover CDN URLs and usage for sample packs\n\nPresets: ${PRESETS.join(', ')}`);
   }
 }
 
