@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames — Velvet v3 (Neo-Soul)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":88,"duration":"22s"}</div>
+  <script>
+    // Pre-fetch Salamander samples BEFORE render.js calls Tone.Offline().
+    // render.js awaits window.TUNEFRAMES_READY before starting the render.
+    // AudioBuffer objects decoded in the online context are valid cross-context
+    // (Web Audio API spec §6.1) so they work inside the offline render.
+    window.TUNEFRAMES_READY = (async () => {
+      const BASE  = 'https://tonejs.github.io/audio/salamander/';
+      const FILES = {
+        'A0':'A0.mp3', 'C1':'C1.mp3', 'F#1':'Fs1.mp3', 'A1':'A1.mp3',
+        'C2':'C2.mp3', 'F#2':'Fs2.mp3','A2':'A2.mp3',  'C3':'C3.mp3',
+        'F#3':'Fs3.mp3','A3':'A3.mp3', 'C4':'C4.mp3',  'F#4':'Fs4.mp3',
+        'A4':'A4.mp3',  'C5':'C5.mp3', 'F#5':'Fs5.mp3','A5':'A5.mp3',
+        'C6':'C6.mp3',  'F#6':'Fs6.mp3','A6':'A6.mp3', 'C7':'C7.mp3',
+      };
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      window._sal = {};
+      await Promise.all(Object.entries(FILES).map(async ([note, file]) => {
+        try {
+          const ab = await (await fetch(BASE + file)).arrayBuffer();
+          window._sal[note] = await ctx.decodeAudioData(ab);
+        } catch (_) {}
+      }));
+      console.log('Salamander: loaded', Object.keys(window._sal).length, 'samples');
+    })();
+
+    async function main() {
+      await Tone.start();
+      Tone.Transport.bpm.value = 88;
+
+      const bar = Tone.Time('1m').toSeconds();
+      const q   = Tone.Time('4n').toSeconds();
+      const e   = Tone.Time('8n').toSeconds();
+      const s   = Tone.Time('16n').toSeconds();
+
+      // Deterministic velocity humanization (~±8% of base, no Math.random)
+      const vel = (base, seed) => Math.max(0.35, Math.min(1.0,
+        base + (((seed * 7919 + 1) % 100) / 100 - 0.5) * 0.16));
+      // Deterministic timing nudge (~±2ms — tight, not sloppy)
+      const hum = (t, seed) =>
+        t + (((seed * 6271 + 3) % 100) / 100 - 0.5) * 0.004;
+
+      // ── SIGNAL CHAINS ────────────────────────────────────────────────
+      // Drums and bass go straight to comp → lim (DRY — no reverb smear)
+      const lim  = new Tone.Limiter(-1).toDestination();
+      const comp = new Tone.Compressor({ threshold: -20, ratio: 3, attack: 0.008, release: 0.18 }).connect(lim);
+
+      // Piano chain: subtle chorus → single delay → comp
+      const pianoDelay  = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.20, wet: 0.22 }).connect(comp);
+      const pianoChorus = new Tone.Chorus({ frequency: 1.2, delayTime: 3.5, depth: 0.40, wet: 0.38 }).connect(pianoDelay);
+      pianoChorus.start();
+
+      // ── RHODES — Salamander samples wrapped as ToneAudioBuffers ──────
+      const salBuffers = {};
+      for (const [note, buf] of Object.entries(window._sal || {})) {
+        salBuffers[note] = new Tone.ToneAudioBuffer(buf);
+      }
+      const hasSamples = Object.keys(salBuffers).length > 0;
+
+      let rhodes, mel;
+      if (hasSamples) {
+        // Real piano samples: LP filter cuts the grand-piano brightness to ~Rhodes range
+        const rhodesLP = new Tone.Filter({ frequency: 4200, type: 'lowpass', rolloff: -12 }).connect(pianoChorus);
+        rhodes = new Tone.Sampler({ urls: salBuffers, attack: 0.01, release: 2.0 }).connect(rhodesLP);
+        rhodes.volume.value = -8;
+
+        const melLP = new Tone.Filter({ frequency: 5500, type: 'lowpass', rolloff: -12 }).connect(pianoDelay);
+        mel = new Tone.Sampler({ urls: salBuffers, attack: 0.006, release: 1.6 }).connect(melLP);
+        mel.volume.value = -9;
+      } else {
+        // FM fallback — much closer to EP character than triangle oscillators
+        const FMPatch = {
+          harmonicity: 1, modulationIndex: 2.5,
+          oscillator: { type: 'sine' },
+          envelope: { attack: 0.001, decay: 0.9, sustain: 0, release: 2.2 },
+          modulation: { type: 'sine' },
+          modulationEnvelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.1 },
+        };
+        rhodes = new Tone.PolySynth(Tone.FMSynth, FMPatch).connect(pianoChorus);
+        rhodes.volume.value = -10;
+        mel = new Tone.Synth({ ...FMPatch,
+          envelope: { attack: 0.001, decay: 0.7, sustain: 0, release: 1.8 },
+        }).connect(pianoDelay);
+        mel.volume.value = -11;
+      }
+
+      // ── SINE PAD — slow swell underneath ─────────────────────────────
+      const pad = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sine' },
+        envelope: { attack: 2.2, decay: 0.5, sustain: 0.85, release: 4.5 }
+      }).connect(pianoChorus);
+      pad.volume.value = -30;
+
+      // ── BASS — DRY ────────────────────────────────────────────────────
+      const bass = new Tone.MonoSynth({
+        oscillator: { type: 'sine' },
+        filter: { Q: 2, type: 'lowpass', rolloff: -12 },
+        filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.6, release: 0.3,
+                          baseFrequency: 80, octaves: 2 },
+        envelope: { attack: 0.014, decay: 0.18, sustain: 0.52, release: 0.3 },
+      }).connect(comp);
+      bass.volume.value = -5;
+
+      // ── KICK — DRY ────────────────────────────────────────────────────
+      const kick = new Tone.MembraneSynth({
+        pitchDecay: 0.065, octaves: 6,
+        envelope: { attack: 0.001, decay: 0.42, sustain: 0, release: 0.30 },
+      }).connect(comp);
+      kick.volume.value = -11;
+
+      // ── SNARE — noise only, wider bandpass for snare "crack" ──────────
+      const snareFlt = new Tone.Filter({ type: 'bandpass', frequency: 3000, Q: 0.8 }).connect(comp);
+      const snare = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.10 },
+      }).connect(snareFlt);
+      snare.volume.value = -15;
+
+      // ── HAT — tight, NO swing ─────────────────────────────────────────
+      const hatFlt = new Tone.Filter(9000, 'highpass').connect(comp);
+      const hat = new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.001, decay: 0.055, sustain: 0, release: 0.030 },
+      }).connect(hatFlt);
+      hat.volume.value = -23;
+
+      // ── CHORD PROGRESSION: Fm9 – Dbmaj7 – Abmaj7 – Eb7 ──────────────
+      const prog = [
+        { chord: ['F3','Ab3','C4','Eb4'], root: 'F2'  },
+        { chord: ['Db3','F3','Ab3','C4'], root: 'Db2' },
+        { chord: ['Ab2','C3','Eb3','G3'], root: 'Ab1' },
+        { chord: ['Eb3','G3','Bb3','Db4'], root: 'Eb2' },
+      ];
+
+      for (let b = 0; b < 8; b++) {
+        const p  = prog[b % 4];
+        const t  = b * bar;
+        const sd = b * 41;
+
+        // Rhodes
+        rhodes.triggerAttackRelease(p.chord, '2n', t, vel(0.68, sd));
+
+        // Pad
+        pad.triggerAttackRelease(p.chord, '1n', t, vel(0.50, sd + 1));
+
+        // Bass: bars 2 onward, syncopated
+        if (b >= 2) {
+          bass.triggerAttackRelease(p.root, '8n',  hum(t,             sd + 2), vel(0.82, sd + 2));
+          bass.triggerAttackRelease(p.root, '8n',  hum(t + q + s,     sd + 3), vel(0.67, sd + 3));
+          bass.triggerAttackRelease(p.root, '8n',  hum(t + 2*q,       sd + 4), vel(0.75, sd + 4));
+          bass.triggerAttackRelease(p.root, '8n',  hum(t + 3*q + 2*s, sd + 5), vel(0.63, sd + 5));
+          if (b % 2 === 1) {
+            bass.triggerAttackRelease(p.root, '16n', hum(t + 4*q - s, sd + 6), vel(0.52, sd + 6));
+          }
+        }
+
+        // Drums: bars 2 onward
+        if (b >= 2) {
+          // Kick: beat 1 → [ghost even bars] → beat 3 — strictly chronological
+          kick.triggerAttackRelease('C1', '8n',  hum(t,         sd * 3),     vel(0.88, sd * 3));
+          if (b % 2 === 0) {
+            kick.triggerAttackRelease('C1', '16n', hum(t + q + e, sd * 3 + 1), vel(0.38, sd * 3 + 1));
+          }
+          kick.triggerAttackRelease('C1', '8n',  hum(t + 2*q,   sd * 3 + 2), vel(0.80, sd * 3 + 2));
+
+          // Snare: beats 2 and 4
+          snare.triggerAttackRelease('8n', hum(t + q,     sd * 5),     vel(0.76, sd * 5));
+          snare.triggerAttackRelease('8n', hum(t + 3*q,   sd * 5 + 1), vel(0.80, sd * 5 + 1));
+
+          // Hats: tight 8th grid — sorted to avoid StateTimeline ordering issues
+          const hatTimes = [];
+          for (let i = 0; i < 8; i++) {
+            hatTimes.push({
+              t: hum(t + i * e, sd * 7 + i),
+              v: vel(i % 2 === 1 ? 0.44 : 0.58, sd * 7 + i),
+            });
+          }
+          // 16th push before beat 3 (t + 2q - s, between 8th notes 3 and 4)
+          hatTimes.push({ t: hum(t + 2*q - s, sd * 7 + 9), v: vel(0.32, sd * 7 + 9) });
+          hatTimes.sort((a, b_) => a.t - b_.t);
+          hatTimes.forEach(({ t: ht, v: hv }) => hat.triggerAttackRelease('16n', ht, hv));
+        }
+      }
+
+      // ── MELODY (bars 2–7) ─────────────────────────────────────────────
+      const melNotes = [
+        // Bar 2 — Fm9
+        { off: 0,               n: 'C5',  d: '4n'  },
+        { off: q,               n: 'Ab4', d: '8n'  },
+        { off: q + e,           n: 'Bb4', d: '8n'  },
+        { off: 2*q,             n: 'Ab4', d: '4n.' },
+        { off: 3*q + e,         n: 'F4',  d: '8n'  },
+        // Bar 3 — Dbmaj7
+        { off: bar,             n: 'Db5', d: '4n'  },
+        { off: bar + q,         n: 'C5',  d: '8n'  },
+        { off: bar + q + e,     n: 'Bb4', d: '8n'  },
+        { off: bar + 2*q,       n: 'Ab4', d: '2n'  },
+        // Bar 4 — Abmaj7
+        { off: 2*bar,           n: 'Bb4', d: '4n'  },
+        { off: 2*bar + q,       n: 'C5',  d: '8n'  },
+        { off: 2*bar + q + e,   n: 'Db5', d: '8n'  },
+        { off: 2*bar + 2*q,     n: 'C5',  d: '8n'  },
+        { off: 2*bar + 2*q + e, n: 'Bb4', d: '8n'  },
+        { off: 2*bar + 3*q,     n: 'Ab4', d: '4n'  },
+        // Bar 5 — Eb7
+        { off: 3*bar,           n: 'G4',  d: '4n.' },
+        { off: 3*bar + q + e,   n: 'Eb4', d: '8n'  },
+        { off: 3*bar + 2*q,     n: 'F4',  d: '2n'  },
+        // Bar 6 — Fm9
+        { off: 4*bar,           n: 'F4',  d: '4n'  },
+        { off: 4*bar + q,       n: 'Ab4', d: '8n'  },
+        { off: 4*bar + q + e,   n: 'C5',  d: '8n'  },
+        { off: 4*bar + 2*q,     n: 'Eb5', d: '4n.' },
+        { off: 4*bar + 3*q + e, n: 'Db5', d: '8n'  },
+        // Bar 7 — Dbmaj7
+        { off: 5*bar,           n: 'C5',  d: '2n'  },
+        { off: 5*bar + 2*q,     n: 'Ab4', d: '2n'  },
+      ];
+
+      const melStart = 2 * bar;
+      melNotes.forEach(({ off, n, d }, idx) => {
+        mel.triggerAttackRelease(n, d,
+          hum(melStart + off, idx * 13 + 200),
+          vel(0.76, idx * 13 + 200));
+      });
+    }
+    main();
+  </script>
+</body>
+</html>
