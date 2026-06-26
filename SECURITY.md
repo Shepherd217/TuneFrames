@@ -2,37 +2,41 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+| Version | Supported |
+| ------- | --------- |
+| 0.x     | Yes — security fixes backported to current minor |
+
+Versions prior to the current 0.x release are not maintained. Upgrade to the latest published version before reporting.
 
 ## Reporting a Vulnerability
 
-If you find a security vulnerability in TuneFrames:
+Email **security@tuneframes.dev** with the following:
 
-1. **Do not** open a public GitHub issue
-2. Email Nathan Shepherd directly at the GitHub security advisory contact
-3. Include:
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Any suggested fixes (optional)
+- **Description** — what the vulnerability is and where it exists
+- **Reproduction steps** — minimal steps or a proof-of-concept file to trigger the issue
+- **Impact** — what an attacker can do if the issue is exploited
 
-We aim to respond within 48 hours and will keep you updated on progress.
+Do **not** open a public GitHub issue for security vulnerabilities. Public disclosure before a patch is available puts all users at risk.
+
+We will acknowledge your report within **48 hours** and keep you informed as we investigate and prepare a fix. We credit reporters in release notes unless you prefer to remain anonymous.
 
 ## Scope
 
-TuneFrames renders HTML compositions using headless Chromium. Security concerns specific to TuneFrames:
+These are the classes of issue we consider in scope for TuneFrames:
 
-- **Arbitrary JavaScript execution:** TuneFrames renders user-authored HTML with Tone.js. Only render compositions from trusted sources.
-- **File system access:** The renderer writes output to paths specified by the caller. Do not run `tuneframes render` on untrusted HTML files without reviewing them first.
-- **FFmpeg:** FFmpeg is invoked as a subprocess. Input files are passed via CLI arguments, not piped input, reducing injection risk.
+- **Arbitrary code execution via malicious HTML compositions** — Playwright renders pages with some Chromium sandbox relaxation. A crafted composition HTML could exploit that to execute code on the rendering host.
+- **Path traversal in `--output` flag handling** — if the output path is insufficiently sanitized, a composition could redirect output to an arbitrary filesystem location.
+- **Dependency vulnerabilities in Playwright or FFmpeg integrations** — known CVEs in `playwright-core` or in the FFmpeg binary invoked as a subprocess that are exploitable through TuneFrames's usage patterns.
+- **npm publish credential exposure** — anything that could leak publish tokens or allow unauthorized package releases.
 
-## Dependencies
+> **Note on network exposure during rendering.** Compositions run in a headless Chromium instance. Malicious HTML can make outbound network requests, which could be used to exfiltrate data from the rendering environment (environment variables, filesystem contents reachable from the page context). A `--no-network` flag to disable network access during rendering is a planned future feature. Until then, only render compositions from sources you trust.
 
-Keep dependencies up to date:
+## Out of Scope
 
-```bash
-npm audit
-npm audit fix
-```
+The following are **not** considered security vulnerabilities for this project:
+
+- Audio quality issues, missing genres, or incorrect output duration
+- Rate limiting — TuneFrames has no server component
+- Authentication bypass — TuneFrames has no authentication layer
+- Bugs that require physical access to the machine running TuneFrames
+- Social engineering attacks against maintainers
