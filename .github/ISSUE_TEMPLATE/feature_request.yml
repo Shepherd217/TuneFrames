@@ -1,0 +1,48 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+labels: [enhancement]
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement to TuneFrames. Please describe what you have in mind.
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Problem or motivation
+      description: What problem does this solve? Why do you need this?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the feature or change you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you tried any workarounds or considered other approaches?
+
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you contribute this?
+      options:
+        - "Yes"
+        - "No"
+        - "Maybe"
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this has not been requested before
+          required: true

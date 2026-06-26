@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - name: Lint example files
+        run: |
+          failed=0
+          for f in examples/example-*.html; do
+            echo "Linting $f..."
+            if ! node src/cli.js lint "$f"; then
+              echo "FAILED: $f"
+              failed=1
+            fi
+          done
+          for f in skills/*/example.html; do
+            echo "Linting $f..."
+            if ! node src/cli.js lint "$f"; then
+              echo "FAILED: $f"
+              failed=1
+            fi
+          done
+          exit $failed
+
+  render-test:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - name: Install ffmpeg
+        run: sudo apt-get install -y ffmpeg
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Render example-lofi.html
+        run: node src/cli.js render examples/example-lofi.html --output /tmp/ci-test.mp3 --timeout 120
+
+      - name: Check output size
+        run: test $(wc -c < /tmp/ci-test.mp3) -gt 5000

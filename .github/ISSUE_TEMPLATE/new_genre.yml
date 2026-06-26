@@ -1,0 +1,61 @@
+name: New Genre Skill
+description: Add a new music genre to the skills library
+labels: [genre-skill]
+title: "[Genre] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for contributing a new genre skill! Before opening this issue, please read the CONTRIBUTING.md guide for the expected directory layout, SKILL.md frontmatter format, and validation requirements.
+
+  - type: input
+    id: genre_name
+    attributes:
+      label: Genre name
+      placeholder: "acoustic-folk  or  dark-ambient"
+    validations:
+      required: true
+
+  - type: input
+    id: bpm_range
+    attributes:
+      label: BPM range
+      placeholder: "60-80"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Genre description for the skill gallery
+      placeholder: |
+        Two sentences describing the sound and feel.
+        Example: "Acoustic folk blends fingerpicked guitar, sparse percussion, and warm vocals into intimate, story-driven arrangements. The production stays dry and close-miked to preserve the live, human feel."
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: Reference tracks
+      description: 2-3 real tracks that define this genre (artist — title).
+
+  - type: dropdown
+    id: validate
+    attributes:
+      label: Does example.html pass `tuneframes validate`?
+      options:
+        - "Yes"
+        - "Not yet"
+        - "Need help"
+
+  - type: checkboxes
+    id: pr_checklist
+    attributes:
+      label: PR checklist
+      options:
+        - label: "`tuneframes validate` passes on example.html"
+        - label: "`tuneframes lint` passes on example.html"
+        - label: SKILL.md frontmatter has `genre`, `bpm_range`, and `description` fields
+        - label: No AudioWorklet effects used (Reverb / Freeverb / BitCrusher / Chebyshev)
+        - label: All notes are scheduled chronologically
