@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TuneFrames Studio — Full Band Demo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+  <div id="tuneframes" style="display:none">{"bpm":95,"duration":"24s"}</div>
+  <script>
+    // Pre-fetch all CDN samples in an online AudioContext before render.js
+    // calls Tone.Offline(). Tone.Offline cannot make network requests.
+    // render.js awaits this promise before starting the offline render.
+    window.TUNEFRAMES_READY = (async () => {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      await ctx.resume();
+
+      const load = async (url) => {
+        try {
+          const buf = await (await fetch(url)).arrayBuffer();
+          return ctx.decodeAudioData(buf);
+        } catch (e) {
+          console.warn('TuneFrames: failed to load', url, e.message);
+          return null;
+        }
+      };
+
+      const GLEITZ = 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM';
+      const SAL    = 'https://tonejs.github.io/audio/salamander';
+      const CR78   = 'https://tonejs.github.io/audio/drum-samples/CR78';
+
+      // All 5 instrument types fetched in parallel
+      const [drums, bassBufs, pianoBufs, stringBufs, trumpetBufs] = await Promise.all([
+
+        // CR78 drums (3 samples)
+        Promise.all([
+          load(`${CR78}/kick.mp3`),
+          load(`${CR78}/snare.mp3`),
+          load(`${CR78}/hihat.mp3`)
+        ]),
+
+        // Electric bass — flat notation only (sharp variants 404 on gleitz)
+        (async () => {
+          const notes = ['A1','Bb1','C2','D2','Eb2','E2','F2','G2','Ab2','A2','B2','C3','D3','E3'];
+          const bufs = {};
+          await Promise.all(notes.map(async n => {
+            const b = await load(`${GLEITZ}/electric_bass_finger-mp3/${n}.mp3`);
+            if (b) bufs[n] = b;
+          }));
+          return bufs;
+        })(),
+
+        // Salamander grand piano — sharp notation (Ds, Fs etc.)
+        (async () => {
+          const notes = ['A1','C2','Ds2','Fs2','A2','C3','Ds3','Fs3','A3','C4','Ds4','Fs4','A4','C5'];
+          const bufs = {};
+          await Promise.all(notes.map(async n => {
+            const b = await load(`${SAL}/${n}.mp3`);
+            if (b) bufs[n] = b;
+          }));
+          return bufs;
+        })(),
+
+        // String ensemble — flat notation
+        (async () => {
+          const notes = ['A2','B2','C3','D3','E3','G3','A3','C4'];
+          const bufs = {};
+          await Promise.all(notes.map(async n => {
+            const b = await load(`${GLEITZ}/string_ensemble_1-mp3/${n}.mp3`);
+            if (b) bufs[n] = b;
+          }));
+          return bufs;
+        })(),
+
+        // Trumpet — flat notation
+        (async () => {
+          const notes = ['A2','B2','C3','D3','E3','G3','A3','C4'];
+          const bufs = {};
+          await Promise.all(notes.map(async n => {
+            const b = await load(`${GLEITZ}/trumpet-mp3/${n}.mp3`);
+            if (b) bufs[n] = b;
+          }));
+          return bufs;
+        })()
+      ]);
+
+      window._kick       = drums[0];
+      window._snare      = drums[1];
+      window._hihat      = drums[2];
+      window._bassBufs   = bassBufs;
+      window._pianoBufs  = pianoBufs;
+      window._stringBufs = stringBufs;
+      window._trumpetBufs = trumpetBufs;
+
+      await ctx.close();
+      console.log('TuneFrames Studio: all samples loaded',
+        Object.keys(bassBufs).length, 'bass,',
+        Object.keys(pianoBufs).length, 'piano,',
+        Object.keys(stringBufs).length, 'strings,',
+        Object.keys(trumpetBufs).length, 'trumpet');
+    })();
+
+    // render.js calls main() inside Tone.Offline — do NOT call Tone.Offline here.
+    // All nodes created in main() automatically join the offline render context.
+    async function main() {
+      await Tone.start();
+
+      Tone.Transport.bpm.value = 95;
+
+      // Time constants at 95 BPM
+      const q   = Tone.Time('4n').toSeconds();   // 0.6316 s
+      const e   = Tone.Time('8n').toSeconds();   // 0.3158 s
+      const s   = Tone.Time('16n').toSeconds();  // 0.1579 s
+      const bar = 4 * q;                         // 2.5263 s
+
+      // ── MASTER CHAIN ───────────────────────────────────────────────────
+      const lim  = new Tone.Limiter(-1).toDestination();
+      const comp = new Tone.Compressor({ threshold: -18, ratio: 3, attack: 0.008, release: 0.2 }).connect(lim);
+
+      // Per-instrument tone shaping (no AudioWorklet effects)
+      const pianoFlt  = new Tone.Filter({ frequency: 5500, type: 'lowpass',  rolloff: -12 }).connect(comp);
+      const stringFlt = new Tone.Filter({ frequency: 2800, type: 'lowpass',  rolloff: -12 }).connect(comp);
+      const trumpetHp = new Tone.Filter({ frequency: 280,  type: 'highpass', rolloff: -12 }).connect(comp);
+
+      // ── DRUMS — CR78 Players ────────────────────────────────────────────
+      const kick  = new Tone.Player(new Tone.ToneAudioBuffer(window._kick)).connect(comp);
+      const snare = new Tone.Player(new Tone.ToneAudioBuffer(window._snare)).connect(comp);
+      const hihat = new Tone.Player(new Tone.ToneAudioBuffer(window._hihat)).connect(comp);
+      kick.volume.value  = -5;
+      snare.volume.value = -8;
+      hihat.volume.value = -14;
+
+      // ── BASS — electric_bass_finger ─────────────────────────────────────
+      const bassUrls = {};
+      for (const [n, b] of Object.entries(window._bassBufs)) {
+        bassUrls[n] = new Tone.ToneAudioBuffer(b);
+      }
+      const bass = new Tone.Sampler({ urls: bassUrls, release: 0.4 }).connect(comp);
+      bass.volume.value = -3;
+
+      // ── PIANO — Salamander grand ────────────────────────────────────────
+      const pianoUrls = {};
+      for (const [n, b] of Object.entries(window._pianoBufs)) {
+        pianoUrls[n] = new Tone.ToneAudioBuffer(b);
+      }
+      const piano = new Tone.Sampler({ urls: pianoUrls, attack: 0.01, release: 1.6 }).connect(pianoFlt);
+      piano.volume.value = -9;
+
+      // ── STRINGS — string_ensemble_1 ─────────────────────────────────────
+      const stringUrls = {};
+      for (const [n, b] of Object.entries(window._stringBufs)) {
+        stringUrls[n] = new Tone.ToneAudioBuffer(b);
+      }
+      const strings = new Tone.Sampler({ urls: stringUrls, attack: 1.0, release: 3.0 }).connect(stringFlt);
+      strings.volume.value = -11;
+
+      // ── TRUMPET ─────────────────────────────────────────────────────────
+      const trumpetUrls = {};
+      for (const [n, b] of Object.entries(window._trumpetBufs)) {
+        trumpetUrls[n] = new Tone.ToneAudioBuffer(b);
+      }
+      const trumpet = new Tone.Sampler({ urls: trumpetUrls, attack: 0.04, release: 1.0 }).connect(trumpetHp);
+      trumpet.volume.value = -7;
+
+      // ── CHORD PROGRESSION: Am7 | Dm7 | G7 | Cmaj7 (4-bar loop) ─────────
+      // All gleitz notes use flat notation; Salamander uses sharp notation.
+      // Sampler interpolates between loaded samples, so off-list notes work.
+      const prog = [
+        {
+          bassWalk:   ['A2', 'E2', 'A2', 'C3'],
+          pianoChord: ['A3', 'C4', 'E4', 'G4'],
+          strChord:   ['A2', 'E3', 'G3'],
+        },
+        {
+          bassWalk:   ['D2', 'A2', 'D2', 'F2'],
+          pianoChord: ['D4', 'F4', 'A4', 'C5'],
+          strChord:   ['D3', 'A3', 'C4'],
+        },
+        {
+          bassWalk:   ['G2', 'D3', 'G2', 'B2'],
+          pianoChord: ['G3', 'B3', 'D4', 'F4'],
+          strChord:   ['G3', 'D3', 'B2'],
+        },
+        {
+          bassWalk:   ['C3', 'G2', 'C3', 'E3'],
+          pianoChord: ['C4', 'E4', 'G4', 'B4'],
+          strChord:   ['C3', 'G3', 'E3'],
+        },
+      ];
+
+      // ── COLLECT ALL EVENTS, SORT, THEN SCHEDULE ─────────────────────────
+      // StateTimeline ordering requirement: schedule each instrument's events
+      // in strictly ascending time order.
+
+      const BARS = 10; // schedule 10 bars; events past 24s are dropped by Offline
+
+      // DRUMS — Tone.Player requires Tone.Transport.schedule
+      const kickEvts  = [];
+      const snareEvts = [];
+      const hihatEvts = [];
+
+      for (let b = 0; b < BARS; b++) {
+        const t = b * bar;
+        if (t >= 24) break;
+        // Kick: beat 1 and beat 3
+        kickEvts.push(t);
+        kickEvts.push(t + 2 * q);
+        // Snare: beat 2 and beat 4
+        snareEvts.push(t + q);
+        snareEvts.push(t + 3 * q);
+        // Hi-hat: every 8th note (8 per bar)
+        for (let i = 0; i < 8; i++) hihatEvts.push(t + i * e);
+      }
+
+      kickEvts.sort((a, b) => a - b);
+      snareEvts.sort((a, b) => a - b);
+      hihatEvts.sort((a, b) => a - b);
+
+      kickEvts.forEach(t  => Tone.Transport.schedule(time => kick.start(time),  t));
+      snareEvts.forEach(t => Tone.Transport.schedule(time => snare.start(time), t));
+      hihatEvts.forEach(t => Tone.Transport.schedule(time => hihat.start(time), t));
+
+      // BASS — funky syncopated line: root on 1, walking 8th on 2+16th, root on 3, passing on 4-and
+      const bassEvts = [];
+      for (let b = 0; b < BARS; b++) {
+        const t  = b * bar;
+        if (t >= 24) break;
+        const bw = prog[b % 4].bassWalk;
+        bassEvts.push({ note: bw[0], dur: '4n', t: t });           // beat 1
+        bassEvts.push({ note: bw[1], dur: '8n', t: t + q + s });   // beat 2 + 16th (synco)
+        bassEvts.push({ note: bw[2], dur: '4n', t: t + 2 * q });   // beat 3
+        bassEvts.push({ note: bw[3], dur: '8n', t: t + 3*q + e }); // beat 4-and (passing)
+      }
+      bassEvts.sort((a, b) => a.t - b.t);
+      bassEvts.forEach(ev => bass.triggerAttackRelease(ev.note, ev.dur, ev.t));
+
+      // PIANO — chord stabs: dotted-quarter on beat 1, quarter on 8th before beat 3
+      const pianoEvts = [];
+      for (let b = 0; b < BARS; b++) {
+        const t  = b * bar;
+        if (t >= 24) break;
+        const ch = prog[b % 4].pianoChord;
+        pianoEvts.push({ notes: ch, dur: '4n.', t: t });
+        const t2 = t + 2*q - e; // anticipation: 8th before beat 3
+        if (t2 >= 0 && t2 < 24) pianoEvts.push({ notes: ch, dur: '4n', t: t2 });
+      }
+      pianoEvts.sort((a, b) => a.t - b.t);
+      pianoEvts.forEach(ev => piano.triggerAttackRelease(ev.notes, ev.dur, ev.t));
+
+      // STRINGS — long pad chords, triggered every 2 bars with slow attack
+      const strEvts = [];
+      for (let b = 0; b < BARS; b += 2) {
+        const t = b * bar;
+        if (t >= 24) break;
+        strEvts.push({ notes: prog[b % 4].strChord, dur: '2m', t: t });
+      }
+      strEvts.sort((a, b) => a.t - b.t);
+      strEvts.forEach(ev => strings.triggerAttackRelease(ev.notes, ev.dur, ev.t));
+
+      // TRUMPET — 4-bar melodic phrase using A-minor pentatonic + D
+      // Enters at bar 2; repeats at bar 6. All notes confirmed on gleitz CDN.
+      const phrase = [
+        // Bar 0 of phrase: ascending line
+        { off: 0,               n: 'E3', d: '4n.' },
+        { off: q + e,           n: 'G3', d: '8n'  },
+        { off: 2 * q,           n: 'A3', d: '2n'  },
+        // Bar 1 of phrase: arch to C4
+        { off: bar,             n: 'A3', d: '4n'  },
+        { off: bar + q,         n: 'C4', d: '4n.' },
+        { off: bar + 2*q + e,   n: 'A3', d: '4n'  },
+        // Bar 2 of phrase: G3 swell
+        { off: 2 * bar,         n: 'G3', d: '2n'  },
+        { off: 2*bar + 2*q,     n: 'A3', d: '2n'  },
+        // Bar 3 of phrase: held C4 resolves
+        { off: 3 * bar,         n: 'C4', d: '1m'  },
+      ];
+
+      const trumpetEvts = [];
+      const trumpetStart = 2 * bar; // enters at bar 2 (~5.05s)
+
+      for (let rep = 0; rep < 2; rep++) {
+        const startT = trumpetStart + rep * 4 * bar;
+        phrase.forEach(ev => {
+          const t = startT + ev.off;
+          if (t < 24) trumpetEvts.push({ n: ev.n, d: ev.d, t });
+        });
+      }
+      trumpetEvts.sort((a, b) => a.t - b.t);
+      trumpetEvts.forEach(ev => trumpet.triggerAttackRelease(ev.n, ev.d, ev.t));
+    }
+
+    main();
+  </script>
+</body>
+</html>
