@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TuneFrames Audio Components — Demo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+</head>
+<body>
+  <!-- Required TuneFrames metadata: BPM 90, 16 seconds -->
+  <div id="tuneframes" style="display:none">{"bpm":90,"duration":"16s"}</div>
+
+  <script>
+    // -------------------------------------------------------------------------
+    // TUNEFRAMES_READY — pre-fetch all samples in an online AudioContext.
+    // Tone.Offline() cannot fetch URLs; everything must be decoded here first.
+    // One AudioContext for all instruments, closed at the end.
+    // -------------------------------------------------------------------------
+    window.TUNEFRAMES_READY = (async () => {
+      const ctx = new AudioContext();
+      await ctx.resume();
+
+      // --- DRUMS (CR78) ---
+      const drumUrls = {
+        kick:  'https://tonejs.github.io/audio/drum-samples/CR78/kick.mp3',
+        snare: 'https://tonejs.github.io/audio/drum-samples/CR78/snare.mp3',
+        hihat: 'https://tonejs.github.io/audio/drum-samples/CR78/hihat.mp3',
+      };
+      const drumBufs = {};
+      for (const [name, url] of Object.entries(drumUrls)) {
+        const res = await fetch(url);
+        const arr = await res.arrayBuffer();
+        drumBufs[name] = await ctx.decodeAudioData(arr);
+      }
+      window._drumBufs = drumBufs;
+
+      // --- PIANO (Salamander Grand) ---
+      // Sharp notation with 's' suffix: Ds4 = D#4, Fs4 = F#4
+      const PIANO_NOTES = ['A1','C2','Ds2','Fs2','A2','C3','Ds3','Fs3','A3','C4','Ds4','Fs4','A4','C5','Ds5','Fs5','A5','C6'];
+      const pianoBufs = {};
+      for (const note of PIANO_NOTES) {
+        const res = await fetch(`https://tonejs.github.io/audio/salamander/${note}.mp3`);
+        const arr = await res.arrayBuffer();
+        pianoBufs[note] = await ctx.decodeAudioData(arr);
+      }
+      window._pianoBufs = pianoBufs;
+
+      // --- ELECTRIC BASS (FluidR3_GM) ---
+      // Flat notation only: Bb1 not As1, Db2 not Cs2
+      const BASS_NOTES = ['A1','Bb1','B1','C2','Db2','D2','Eb2','E2','F2','G2','Ab2','A2','Bb2','C3','D3','E3','G3','A3','C4'];
+      const bassBufs = {};
+      for (const note of BASS_NOTES) {
+        const res = await fetch(`https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/electric_bass_finger-mp3/${note}.mp3`);
+        const arr = await res.arrayBuffer();
+        bassBufs[note] = await ctx.decodeAudioData(arr);
+      }
+      window._bassBufs = bassBufs;
+
+      await ctx.close();
+    })();
+
+    // -------------------------------------------------------------------------
+    // main() — called by TuneFrames render pipeline
+    // -------------------------------------------------------------------------
+    async function main() {
+      await Tone.start();
+      // Wait for all CDN samples to finish loading
+      await window.TUNEFRAMES_READY;
+
+      Tone.Transport.bpm.value = 90;
+
+      // BPM-derived timing constants
+      const bps  = 90 / 60;         // beats per second
+      const beat = 1 / bps;         // seconds per beat  (~0.667s at 90 BPM)
+      const bar  = 4 * beat;        // seconds per bar   (~2.667s at 90 BPM)
+
+      // Shared signal chain — safe effects only (no AudioWorklet)
+      const limiter = new Tone.Limiter(-1).toDestination();
+      const comp    = new Tone.Compressor(-18, 3).connect(limiter);
+
+      const buffer = await Tone.Offline(async () => {
+
+        // -----------------------------------------------------------------------
+        // DRUMS — CR78 via Tone.Player (one Player per hit type)
+        // -----------------------------------------------------------------------
+        const kick  = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.kick)).connect(comp);
+        const snare = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.snare)).connect(comp);
+        const hihat = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.hihat)).connect(comp);
+
+        // 4-bar loop repeated 2.4× over 16s (≈6 bars at 90 BPM)
+        // Kick: beats 1 and 3 of every bar
+        // Snare: beats 2 and 4 of every bar
+        // Hi-hat: every 8th note (every half beat)
+        const numBars = 6;
+        const kickTimes  = [];
+        const snareTimes = [];
+        const hihatTimes = [];
+
+        for (let b = 0; b < numBars; b++) {
+          const barStart = b * bar;
+          kickTimes.push(barStart,           barStart + 2 * beat);
+          snareTimes.push(barStart + beat,   barStart + 3 * beat);
+          for (let h = 0; h < 8; h++) {
+            hihatTimes.push(barStart + h * beat * 0.5);
+          }
+        }
+
+        kickTimes.sort((a, b) => a - b).forEach(t =>
+          Tone.Transport.schedule(time => kick.start(time),  t));
+        snareTimes.sort((a, b) => a - b).forEach(t =>
+          Tone.Transport.schedule(time => snare.start(time), t));
+        hihatTimes.sort((a, b) => a - b).forEach(t =>
+          Tone.Transport.schedule(time => hihat.start(time), t));
+
+        // -----------------------------------------------------------------------
+        // PIANO — Salamander Grand via Tone.Sampler
+        // Melody over 4 bars in A minor, then repeats
+        // -----------------------------------------------------------------------
+        const pianoUrls = {};
+        for (const [note, buf] of Object.entries(window._pianoBufs)) {
+          pianoUrls[note] = new Tone.ToneAudioBuffer(buf);
+        }
+        const piano = new Tone.Sampler({ urls: pianoUrls }).connect(comp);
+
+        // 4-bar melody (A minor feel: A C D E G)
+        // Time values in seconds, sorted before scheduling
+        const melodyBar = [
+          // Bar 1 — ascending arpeggio
+          { note: 'A3',  dur: '8n',  t: 0 },
+          { note: 'C4',  dur: '8n',  t: beat * 0.5 },
+          { note: 'E4',  dur: '4n',  t: beat },
+          { note: 'A4',  dur: '4n',  t: beat * 2 },
+          { note: 'G4',  dur: '8n',  t: beat * 3 },
+          { note: 'E4',  dur: '8n',  t: beat * 3.5 },
+          // Bar 2 — answer phrase
+          { note: 'D4',  dur: '4n',  t: bar },
+          { note: 'F4',  dur: '4n',  t: bar + beat },
+          { note: 'A4',  dur: '2n',  t: bar + beat * 2 },
+          // Bar 3 — descend
+          { note: 'G4',  dur: '8n',  t: bar * 2 },
+          { note: 'E4',  dur: '8n',  t: bar * 2 + beat * 0.5 },
+          { note: 'D4',  dur: '4n',  t: bar * 2 + beat },
+          { note: 'C4',  dur: '4n',  t: bar * 2 + beat * 2 },
+          { note: 'A3',  dur: '4n',  t: bar * 2 + beat * 3 },
+          // Bar 4 — resolution
+          { note: 'E4',  dur: '4n',  t: bar * 3 },
+          { note: 'A4',  dur: '2n',  t: bar * 3 + beat },
+          { note: 'C5',  dur: '4n',  t: bar * 3 + beat * 3 },
+        ];
+
+        // Repeat melody for bars 5–6 (second half of the 16s piece)
+        const melodyBar2 = melodyBar.map(e => ({ ...e, t: e.t + bar * 4 }));
+
+        // Combine, sort, schedule
+        const allPianoEvents = [...melodyBar, ...melodyBar2].sort((a, b) => a.t - b.t);
+        allPianoEvents.forEach(e => piano.triggerAttackRelease(e.note, e.dur, e.t));
+
+        // -----------------------------------------------------------------------
+        // ELECTRIC BASS — FluidR3_GM via Tone.Sampler
+        // Root-fifth bass line following the chord progression
+        // A minor: Am – F – C – G (repeated)
+        // -----------------------------------------------------------------------
+        const bassUrls = {};
+        for (const [note, buf] of Object.entries(window._bassBufs)) {
+          bassUrls[note] = new Tone.ToneAudioBuffer(buf);
+        }
+        const bass = new Tone.Sampler({ urls: bassUrls }).connect(comp);
+
+        // Bass line: root on beat 1, fifth on beat 3 per bar
+        // Am → A2/E2,  F → F2/C3,  C → C3/G2,  G → G2/D3
+        // Repeats every 4 bars over 6 bars total
+        const bassPattern = [
+          // Bar 1 — Am
+          { note: 'A2',  dur: '4n', t: 0 },
+          { note: 'A2',  dur: '8n', t: beat },
+          { note: 'E2',  dur: '4n', t: beat * 2 },
+          { note: 'A2',  dur: '8n', t: beat * 3 },
+          // Bar 2 — F
+          { note: 'F2',  dur: '4n', t: bar },
+          { note: 'F2',  dur: '8n', t: bar + beat },
+          { note: 'C3',  dur: '4n', t: bar + beat * 2 },
+          { note: 'F2',  dur: '8n', t: bar + beat * 3 },
+          // Bar 3 — C
+          { note: 'C3',  dur: '4n', t: bar * 2 },
+          { note: 'C3',  dur: '8n', t: bar * 2 + beat },
+          { note: 'G2',  dur: '4n', t: bar * 2 + beat * 2 },
+          { note: 'C3',  dur: '8n', t: bar * 2 + beat * 3 },
+          // Bar 4 — G
+          { note: 'G2',  dur: '4n', t: bar * 3 },
+          { note: 'G2',  dur: '8n', t: bar * 3 + beat },
+          { note: 'D3',  dur: '4n', t: bar * 3 + beat * 2 },
+          { note: 'G2',  dur: '8n', t: bar * 3 + beat * 3 },
+        ];
+
+        // Repeat for bars 5–6
+        const bassPattern2 = bassPattern.map(e => ({ ...e, t: e.t + bar * 4 }));
+
+        // Combine, sort, schedule
+        const allBassEvents = [...bassPattern, ...bassPattern2].sort((a, b) => a.t - b.t);
+        allBassEvents.forEach(e => bass.triggerAttackRelease(e.note, e.dur, e.t));
+
+        // Start transport inside Tone.Offline
+        Tone.Transport.start();
+
+      }, 16); // 16 seconds duration
+
+      // Export the rendered buffer as WAV
+      const wav = Tone.Offline.toAudioBuffer ? buffer : buffer;
+      return buffer;
+    }
+
+    main();
+  </script>
+</body>
+</html>
