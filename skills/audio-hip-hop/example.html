@@ -10,8 +10,43 @@
   <div id="tuneframes" style="display:none">{"bpm":88,"duration":"12s"}</div>
 
   <script>
+    // Pre-fetch CDN samples before Tone.Offline starts — Offline context cannot fetch URLs
+    window.TUNEFRAMES_READY = (async () => {
+      const ctx = new AudioContext();
+      await ctx.resume();
+
+      // CR78 drum samples
+      const drumUrls = {
+        kick:  'https://tonejs.github.io/audio/drum-samples/CR78/kick.mp3',
+        snare: 'https://tonejs.github.io/audio/drum-samples/CR78/snare.mp3',
+        hihat: 'https://tonejs.github.io/audio/drum-samples/CR78/hihat.mp3',
+      };
+      const drumBufs = {};
+      for (const [name, url] of Object.entries(drumUrls)) {
+        const res = await fetch(url);
+        const arr = await res.arrayBuffer();
+        drumBufs[name] = await ctx.decodeAudioData(arr);
+      }
+      window._drumBufs = drumBufs;
+
+      // FluidR3_GM electric_bass_finger — flat notation, confirmed 200 OK
+      const BASS_NOTES = ['A1', 'Bb1', 'C2', 'D2', 'Eb2', 'G2', 'A2'];
+      const bassBufs = {};
+      for (const note of BASS_NOTES) {
+        const res = await fetch(
+          'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/electric_bass_finger-mp3/' + note + '.mp3'
+        );
+        const arr = await res.arrayBuffer();
+        bassBufs[note] = await ctx.decodeAudioData(arr);
+      }
+      window._bassBufs = bassBufs;
+
+      await ctx.close();
+    })();
+
     async function main() {
       await Tone.start();
+      await window.TUNEFRAMES_READY;
 
       // Set BPM so Tone.Time string values resolve correctly
       Tone.Transport.bpm.value = 88;
@@ -25,47 +60,29 @@
       const masterLimiter = new Tone.Limiter(-1).toDestination();
       const masterGain    = new Tone.Gain(0.82).connect(masterLimiter);
 
-      // --- KICK — punchy MembraneSynth ---
+      // --- KICK (CR78 sample via Tone.Player) ---
       const kickDist = new Tone.Distortion({ distortion: 0.2, wet: 0.4 }).connect(masterGain);
       const kickGain = new Tone.Gain(0.88).connect(kickDist);
-      const kick     = new Tone.MembraneSynth({
-        pitchDecay: 0.07,
-        octaves: 6,
-        envelope: { attack: 0.001, decay: 0.32, sustain: 0, release: 0.1 }
-      }).connect(kickGain);
+      const kick = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.kick)).connect(kickGain);
 
-      // --- SNARE — white noise with reverb tail ---
+      // --- SNARE (CR78 sample via Tone.Player, keep reverb chain) ---
       const snareVerb = new Tone.Reverb({ decay: 1.8, wet: 0.5 }).connect(masterGain);
       const snareGain = new Tone.Gain(0.52).connect(snareVerb);
-      const snare     = new Tone.NoiseSynth({
-        noise: { type: "white" },
-        envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.06 }
-      }).connect(snareGain);
+      const snare = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.snare)).connect(snareGain);
 
-      // --- HI-HAT — MetalSynth, short and crisp ---
+      // --- HI-HAT (CR78 sample via Tone.Player) ---
       const hatGain = new Tone.Gain(0.28).connect(masterGain);
-      const hat     = new Tone.MetalSynth({
-        frequency: 500,
-        envelope: { attack: 0.001, decay: 0.04, release: 0.01 },
-        harmonicity: 5.1,
-        modulationIndex: 24,
-        resonance: 4000,
-        octaves: 1.2
-      }).connect(hatGain);
+      const hihat = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.hihat)).connect(hatGain);
 
-      // --- BASS — MonoSynth with filter envelope ---
+      // --- BASS (FluidR3_GM electric_bass_finger via Tone.Sampler) ---
       const bassGain = new Tone.Gain(0.7).connect(masterGain);
-      const bass     = new Tone.MonoSynth({
-        oscillator: { type: "sawtooth" },
-        filter: { Q: 2, type: "lowpass", rolloff: -12 },
-        filterEnvelope: {
-          attack: 0.01, decay: 0.2, sustain: 0.4, release: 0.3,
-          baseFrequency: 120, octaves: 1.5
-        },
-        envelope: { attack: 0.01, decay: 0.15, sustain: 0.7, release: 0.3 }
-      }).connect(bassGain);
+      const bassUrls = {};
+      for (const [note, buf] of Object.entries(window._bassBufs)) {
+        bassUrls[note] = new Tone.ToneAudioBuffer(buf);
+      }
+      const bass = new Tone.Sampler({ urls: bassUrls }).connect(bassGain);
 
-      // --- SOUL PAD — warm PolySynth, slow attack ---
+      // --- SOUL PAD — warm PolySynth, slow attack (keep as synth) ---
       const padVerb = new Tone.Reverb({ decay: 3.5, wet: 0.5 }).connect(masterGain);
       const padGain = new Tone.Gain(0.35).connect(padVerb);
       const pad     = new Tone.PolySynth(Tone.Synth, {
@@ -74,30 +91,33 @@
       }).connect(padGain);
 
       // --- KICK PATTERN — beat 1, "and" of 2, beat 3 (classic boom bap) ---
-      // 16-step grid: positions 0, 6, 8
+      // Collect times, sort chronologically, then schedule
+      const kickTimes = [];
       for (let b = 0; b < numBars; b++) {
-        [0, 6, 8].forEach(step => {
-          kick.triggerAttackRelease("C1", beat * 0.5, b * bar + step * s16);
-        });
+        [0, 6, 8].forEach(step => kickTimes.push(b * bar + step * s16));
       }
+      kickTimes.sort((a, b) => a - b);
+      kickTimes.forEach(t => kick.start(t));
 
       // --- SNARE — strictly beats 2 and 4 (steps 4 and 12) ---
+      const snareTimes = [];
       for (let b = 0; b < numBars; b++) {
-        [4, 12].forEach(step => {
-          snare.triggerAttackRelease(beat * 0.5, b * bar + step * s16);
-        });
+        [4, 12].forEach(step => snareTimes.push(b * bar + step * s16));
       }
+      snareTimes.sort((a, b) => a - b);
+      snareTimes.forEach(t => snare.start(t));
 
-      // --- HI-HAT — all 16 steps per bar, velocity variation adds humanity ---
-      const hatVels = [0.9,0.45,0.85,0.4,0.9,0.45,0.85,0.4,0.9,0.45,0.9,0.4,0.85,0.45,0.9,0.45];
+      // --- HI-HAT — all 16 steps per bar ---
+      const hihatTimes = [];
       for (let b = 0; b < numBars; b++) {
         for (let s = 0; s < 16; s++) {
-          hat.triggerAttackRelease(s16 * 0.8, b * bar + s * s16, hatVels[s]);
+          hihatTimes.push(b * bar + s * s16);
         }
       }
+      hihatTimes.sort((a, b) => a - b);
+      hihatTimes.forEach(t => hihat.start(t));
 
       // --- BASS LINE — Fm vamp: 2-bar phrase played twice ---
-      // phrase repeats at bars 0-1 and bars 2-3
       const bassPhrase = [
         { step: 0,  note: "F1",  dur: beat },
         { step: 4,  note: "F1",  dur: beat * 0.5 },
@@ -112,11 +132,14 @@
         { step: 26, note: "G1",  dur: beat * 0.5 },
         { step: 28, note: "F1",  dur: beat },
       ];
+      const bassEvents = [];
       for (let phrase = 0; phrase < 2; phrase++) {
         bassPhrase.forEach(({ step, note, dur }) => {
-          bass.triggerAttackRelease(note, dur, phrase * 2 * bar + step * s16);
+          bassEvents.push({ note, dur, t: phrase * 2 * bar + step * s16 });
         });
       }
+      bassEvents.sort((a, b) => a.t - b.t);
+      bassEvents.forEach(e => bass.triggerAttackRelease(e.note, e.dur, e.t));
 
       // --- SOUL PAD — Fm7 bars 0-1, Bbm7 bars 2-3 ---
       pad.triggerAttackRelease(["F3","Ab3","C4","Eb4"],  bar * 2, 0);

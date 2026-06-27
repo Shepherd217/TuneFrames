@@ -8,7 +8,8 @@ description: Boom Bap Hip Hop — punchy kick, snare on 2 and 4 with reverb tail
 ## Genre Profile
 - BPM range: 80–95 (slow enough to feel heavy)
 - Key characteristics: Heavy kick with short distortion (MembraneSynth), snare strictly on beats 2 and 4 with long reverb tail, 16th-note hi-hats with Tone.Transport swing (0.4–0.6) for the shuffle, smooth chromatic bass line, warm pad chord with slow attack for "sampled soul" texture
-- Typical instruments: MembraneSynth (kick), NoiseSynth (snare), MetalSynth or NoiseSynth (hat), MonoSynth or Synth (bass), PolySynth (pad)
+- Typical instruments: Tone.Player + CR78 samples (kick, snare, hihat via tonejs.github.io CDN), Tone.Sampler + FluidR3_GM electric_bass_finger (bass via gleitz.github.io CDN), PolySynth (pad — keep as synth)
+- CDN sample pattern: pre-fetch all URLs in `window.TUNEFRAMES_READY` before `main()`, wrap decoded buffers with `new Tone.ToneAudioBuffer(buf)` inside `main()` (Tone.Offline cannot fetch URLs directly)
 - Mood: Head-nodding, soulful, heavy, hypnotic, dusty
 
 ## Core Pattern
@@ -46,43 +47,29 @@ Tone.Transport.start();
 ## Instrument Configuration
 
 ```js
-// Kick — MembraneSynth with slight saturation (the "punchy" sound)
+// Kick — CR78 sample with slight saturation (the "punchy" sound)
+// Pre-fetch in window.TUNEFRAMES_READY; wrap with ToneAudioBuffer inside main()
 const kickDist = new Tone.Distortion({ distortion: 0.2, wet: 0.4 }).toDestination();
-const kick = new Tone.MembraneSynth({
-  pitchDecay: 0.07,
-  octaves: 6,
-  envelope: { attack: 0.001, decay: 0.32, sustain: 0, release: 0.1 },
-  volume: 0
-}).connect(kickDist);
+const kickGain = new Tone.Gain(0.88).connect(kickDist);
+const kick = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.kick)).connect(kickGain);
 
-// Snare — white noise with a long reverb tail (the "room" sound)
+// Snare — CR78 sample with a long reverb tail (the "room" sound)
 const snareVerb = new Tone.Reverb({ decay: 1.8, wet: 0.5 }).toDestination();
-const snare = new Tone.NoiseSynth({
-  noise: { type: "white" },
-  envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.06 },
-  volume: -4
-}).connect(snareVerb);
+const snareGain = new Tone.Gain(0.52).connect(snareVerb);
+const snare = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.snare)).connect(snareGain);
 
-// Hi-hat — crisp, short, metallic
-const hat = new Tone.MetalSynth({
-  frequency: 500,
-  envelope: { attack: 0.001, decay: 0.04, release: 0.01 },
-  harmonicity: 5.1,
-  modulationIndex: 24,
-  resonance: 4000,
-  octaves: 1.2,
-  volume: -12
-}).toDestination();
+// Hi-hat — CR78 sample, crisp and real
+const hatGain = new Tone.Gain(0.28).toDestination();
+const hihat = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.hihat)).connect(hatGain);
 
-// Bass — MonoSynth, smooth but defined
-const bass = new Tone.MonoSynth({
-  oscillator: { type: "sawtooth" },
-  filter: { Q: 2, type: "lowpass", rolloff: -12 },
-  filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.4, release: 0.3,
-                    baseFrequency: 120, octaves: 1.5 },
-  envelope: { attack: 0.01, decay: 0.15, sustain: 0.7, release: 0.3 },
-  volume: -4
-}).toDestination();
+// Bass — FluidR3_GM electric_bass_finger Sampler (flat notation: Bb, Eb, Ab, Gb — NOT sharp)
+// Notes A1,Bb1,C2,D2,Eb2,G2,A2 cover the Fm vamp range; Sampler pitch-shifts for F1/G1/Ab1
+const bassGain = new Tone.Gain(0.7).toDestination();
+const bassUrls = {};
+for (const [note, buf] of Object.entries(window._bassBufs)) {
+  bassUrls[note] = new Tone.ToneAudioBuffer(buf);
+}
+const bass = new Tone.Sampler({ urls: bassUrls }).connect(bassGain);
 
 // Soul pad — warm PolySynth, slow attack = "reverse sample" texture
 const padVerb = new Tone.Reverb({ decay: 3.5, wet: 0.5 }).toDestination();

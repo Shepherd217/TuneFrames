@@ -1,13 +1,55 @@
 <div id="tuneframes" style="display:none">{"bpm":80,"duration":"14s"}</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 <script>
-// TuneFrames — Orchestral
+// TuneFrames — Orchestral (CDN samples: string_ensemble_1, trumpet, flute)
 // D minor: strings carry melody, brass confirm harmony,
 // woodwinds add color, timpani on downbeats
 // Proper voice leading — each section has a role
 
+// Pre-fetch gleitz FluidR3_GM samples BEFORE render.js calls Tone.Offline().
+// render.js awaits window.TUNEFRAMES_READY before starting the render.
+// AudioBuffer objects decoded in the online context are valid cross-context
+// (Web Audio API spec §6.1) so they work inside the offline render.
+const _GLEITZ = 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM';
+
+window.TUNEFRAMES_READY = (async () => {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // Strings — string_ensemble_1 (D4–F5 range, gleitz flat notation)
+  window._strBufs = {};
+  await Promise.all(['C4','Eb4','G4','Bb4','D5','F5'].map(async n => {
+    try {
+      const ab = await (await fetch(`${_GLEITZ}/string_ensemble_1-mp3/${n}.mp3`)).arrayBuffer();
+      window._strBufs[n] = await ctx.decodeAudioData(ab);
+    } catch (_) {}
+  }));
+
+  // Brass — trumpet (G2–D4 range, gleitz flat notation)
+  window._brassBufs = {};
+  await Promise.all(['G2','Bb2','D3','F3','A3','C4'].map(async n => {
+    try {
+      const ab = await (await fetch(`${_GLEITZ}/trumpet-mp3/${n}.mp3`)).arrayBuffer();
+      window._brassBufs[n] = await ctx.decodeAudioData(ab);
+    } catch (_) {}
+  }));
+
+  // Woodwinds — flute (F4–F5 range)
+  window._fluteBufs = {};
+  await Promise.all(['F4','A4','C5','F5'].map(async n => {
+    try {
+      const ab = await (await fetch(`${_GLEITZ}/flute-mp3/${n}.mp3`)).arrayBuffer();
+      window._fluteBufs[n] = await ctx.decodeAudioData(ab);
+    } catch (_) {}
+  }));
+
+  console.log('Orchestral samples — strings:', Object.keys(window._strBufs).length,
+    '| brass:', Object.keys(window._brassBufs).length,
+    '| flute:', Object.keys(window._fluteBufs).length);
+})();
+
 async function main() {
   await Tone.start();
+  await window.TUNEFRAMES_READY;
 
   const beat = 60 / 80;     // 0.75s per quarter note
   const half = beat * 2;    // 1.5s per half note
@@ -17,31 +59,53 @@ async function main() {
   await reverb.generate();
   reverb.toDestination();
 
-  // ── STRINGS — PolySynth triangle, slow bow-attack ─────────────────────────
-  const strings = new Tone.PolySynth(Tone.Synth, {
-    oscillator: { type: 'triangle' },
-    envelope: { attack: 0.75, decay: 0.2, sustain: 0.95, release: 1.5 },
-    volume: -5,
-  });
+  // ── Wrap pre-fetched buffers for Offline context ──────────────────────────
+  const strUrls = {};
+  for (const [n, buf] of Object.entries(window._strBufs || {})) {
+    strUrls[n] = new Tone.ToneAudioBuffer(buf);
+  }
+
+  const brassUrls = {};
+  for (const [n, buf] of Object.entries(window._brassBufs || {})) {
+    brassUrls[n] = new Tone.ToneAudioBuffer(buf);
+  }
+
+  const fluteUrls = {};
+  for (const [n, buf] of Object.entries(window._fluteBufs || {})) {
+    fluteUrls[n] = new Tone.ToneAudioBuffer(buf);
+  }
+
+  // ── STRINGS — Sampler (gleitz string_ensemble_1), slow bow-attack ─────────
+  const strings = Object.keys(strUrls).length > 0
+    ? new Tone.Sampler({ urls: strUrls, attack: 0.75, release: 1.5, volume: -5 })
+    : new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.75, decay: 0.2, sustain: 0.95, release: 1.5 },
+        volume: -5,
+      });
   strings.connect(reverb);
 
-  // ── BRASS — PolySynth sawtooth, medium breath-attack ─────────────────────
-  const brass = new Tone.PolySynth(Tone.Synth, {
-    oscillator: { type: 'sawtooth' },
-    envelope: { attack: 0.32, decay: 0.35, sustain: 0.72, release: 1.0 },
-    volume: -10,
-  });
+  // ── BRASS — Sampler (gleitz trumpet), medium breath-attack ───────────────
+  const brass = Object.keys(brassUrls).length > 0
+    ? new Tone.Sampler({ urls: brassUrls, attack: 0.32, release: 1.0, volume: -10 })
+    : new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.32, decay: 0.35, sustain: 0.72, release: 1.0 },
+        volume: -10,
+      });
   brass.connect(reverb);
 
-  // ── WOODWINDS — AMSynth for reedy, breathy character ─────────────────────
-  const woodwinds = new Tone.AMSynth({
-    harmonicity: 1.0,
-    oscillator: { type: 'triangle' },
-    envelope: { attack: 0.14, decay: 0.1, sustain: 0.88, release: 0.6 },
-    modulation: { type: 'square' },
-    modulationEnvelope: { attack: 0.5, decay: 0.0, sustain: 0.3, release: 0.5 },
-    volume: -16,
-  });
+  // ── WOODWINDS — Sampler (gleitz flute), breathy color ────────────────────
+  const woodwinds = Object.keys(fluteUrls).length > 0
+    ? new Tone.Sampler({ urls: fluteUrls, attack: 0.14, release: 0.6, volume: -16 })
+    : new Tone.AMSynth({
+        harmonicity: 1.0,
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.14, decay: 0.1, sustain: 0.88, release: 0.6 },
+        modulation: { type: 'square' },
+        modulationEnvelope: { attack: 0.5, decay: 0.0, sustain: 0.3, release: 0.5 },
+        volume: -16,
+      });
   woodwinds.connect(reverb);
 
   // ── TIMPANI — MembraneSynth, long resonating pitch ───────────────────────

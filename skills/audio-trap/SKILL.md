@@ -8,7 +8,9 @@ description: Trap — 808 sub bass with pitch bend, snare on 2 and 4, rapid hi-h
 ## Genre Profile
 - BPM range: 130–160 (half-time feel makes it sit like 65–80)
 - Key characteristics: 808 sub bass with long decay and downward pitch bend, snare on beats 2 and 4, hi-hat rolls in 16th/32nd triplets with strong velocity variation, heavy low end, atmospheric elements
-- Typical instruments: MembraneSynth (808 sub), NoiseSynth (snare), MetalSynth (hi-hats), PolySynth (strings/pads)
+- Typical instruments: MembraneSynth (808 sub), NoiseSynth (snare), CR78 Tone.Player (kick + hi-hats via tonejs CDN), Tone.Sampler with electric_bass_finger-mp3 (bass definition via gleitz FluidR3_GM CDN), PolySynth (strings/pads)
+- Real samples: CR78 kick and hihat from `https://tonejs.github.io/audio/drum-samples/CR78/`; electric bass from `https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/electric_bass_finger-mp3/` (flat notation only: Bb, Eb, Gb, Ab — not sharps)
+- CDN samples require `window.TUNEFRAMES_READY` pre-fetch pattern (see example.html) — Tone.Offline cannot fetch URLs directly
 - Mood: Menacing, cinematic, heavy, dramatic
 
 ## Core Pattern

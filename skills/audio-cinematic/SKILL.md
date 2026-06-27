@@ -8,7 +8,9 @@ description: Cinematic Score — epic orchestral builds, pad swells, ostinato, t
 ## Genre Profile
 - BPM range: 60–90 (slow and grand; let notes breathe)
 - Key characteristics: Slow harmonic rhythm, long-attack pads, ostinato string figures, brass swells on climax, no drums until climax (if at all), layered dynamics from pp to ff
-- Typical instruments: String pads (PolySynth sawtooth, long attack), brass (PolySynth sawtooth, fast attack), choir pad (PolySynth sine), low piano (Synth), timpani (MembraneSynth)
+- Typical instruments: String pads (Tone.Sampler → gleitz string_ensemble_1, or PolySynth sawtooth fallback), brass lead (Tone.Sampler → gleitz trumpet), low piano (Tone.Sampler → Salamander Grand), choir pad (PolySynth sine), cello ostinato (Synth sawtooth), timpani (MembraneSynth)
+- CDN sample sets: `string_ensemble_1-mp3` and `trumpet-mp3` from gleitz FluidR3_GM (flat notation: Bb/Db/Eb not As/Cs/Ds); Salamander Grand from tonejs CDN (sharp 's' suffix: Ds2/Fs2)
+- Pre-fetch pattern: set `window.TUNEFRAMES_READY` before `main()` — render.js awaits it before Tone.Offline; wrap decoded buffers with `new Tone.ToneAudioBuffer(buf)` inside main()
 - Mood: Epic, emotional, suspenseful, grand, sweeping — Zimmer / Morricone / Williams
 
 ## Core Pattern

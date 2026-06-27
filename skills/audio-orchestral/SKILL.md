@@ -8,7 +8,7 @@ description: Full orchestral writing — strings carry melody, brass punctuate, 
 ## Genre Profile
 - BPM range: 60-120 (varies by mood — slow for drama, faster for action)
 - Key characteristics: proper voice leading between parts, strings as primary melodic voice, brass on structural downbeats, timpani emphasizes phrase endings, woodwinds add color between string phrases
-- Typical instruments: PolySynth triangle (strings), PolySynth sawtooth (brass), MembraneSynth (timpani), AMSynth (woodwinds)
+- Typical instruments: Tone.Sampler from gleitz FluidR3_GM CDN (strings=string_ensemble_1, brass=trumpet, woodwinds=flute), MembraneSynth (timpani). Synth fallbacks activate if CDN fetch fails.
 - Mood: cinematic, epic, emotional, noble
 
 ## Core Pattern
@@ -23,20 +23,13 @@ const reverb = new Tone.Reverb({ decay: 3.5, preDelay: 0.04, wet: 0.7 });
 await reverb.generate();
 reverb.toDestination();
 
-// STRINGS — PolySynth, triangle wave, slow attack (bowing)
-const strings = new Tone.PolySynth(Tone.Synth, {
-  oscillator: { type: 'triangle' },
-  envelope: { attack: 0.8, decay: 0.3, sustain: 0.9, release: 1.5 },
-  volume: -6,
-});
+// STRINGS — gleitz string_ensemble_1 Sampler, slow bow-attack
+// (see Instrument Configuration section for TUNEFRAMES_READY pre-fetch pattern)
+const strings = new Tone.Sampler({ urls: strUrls, attack: 0.75, release: 1.5, volume: -5 });
 strings.connect(reverb);
 
-// BRASS — PolySynth, sawtooth, medium attack (breath to tone)
-const brass = new Tone.PolySynth(Tone.Synth, {
-  oscillator: { type: 'sawtooth' },
-  envelope: { attack: 0.3, decay: 0.4, sustain: 0.7, release: 0.8 },
-  volume: -10,
-});
+// BRASS — gleitz trumpet Sampler, medium breath-attack; polyphonic (chord arrays work)
+const brass = new Tone.Sampler({ urls: brassUrls, attack: 0.32, release: 1.0, volume: -10 });
 brass.connect(reverb);
 
 // TIMPANI — MembraneSynth with long resonance
@@ -69,48 +62,74 @@ Tone.Transport.scheduleOnce(t => brass.triggerAttackRelease(['G3','D4'], '2n', t
 
 ## Instrument Configuration
 
+Real CDN samples via gleitz FluidR3_GM. Use flat notation in URLs (Bb not As, Eb not Ds).
+Pre-fetch in `window.TUNEFRAMES_READY` before `Tone.Offline`; wrap with `new Tone.ToneAudioBuffer(buf)` inside main().
+
 ```js
-// Hall reverb — orchestras play in halls
-const reverb = new Tone.Reverb({ decay: 3.5, preDelay: 0.05, wet: 0.7 });
-await reverb.generate();
-reverb.toDestination();
+// Pre-fetch samples — runs before render.js calls Tone.Offline()
+const _GLEITZ = 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM';
+window.TUNEFRAMES_READY = (async () => {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  window._strBufs = {};
+  await Promise.all(['C4','Eb4','G4','Bb4','D5','F5'].map(async n => {
+    try {
+      const ab = await (await fetch(`${_GLEITZ}/string_ensemble_1-mp3/${n}.mp3`)).arrayBuffer();
+      window._strBufs[n] = await ctx.decodeAudioData(ab);
+    } catch (_) {}
+  }));
+  window._brassBufs = {};
+  await Promise.all(['G2','Bb2','D3','F3','A3','C4'].map(async n => {
+    try {
+      const ab = await (await fetch(`${_GLEITZ}/trumpet-mp3/${n}.mp3`)).arrayBuffer();
+      window._brassBufs[n] = await ctx.decodeAudioData(ab);
+    } catch (_) {}
+  }));
+  window._fluteBufs = {};
+  await Promise.all(['F4','A4','C5','F5'].map(async n => {
+    try {
+      const ab = await (await fetch(`${_GLEITZ}/flute-mp3/${n}.mp3`)).arrayBuffer();
+      window._fluteBufs[n] = await ctx.decodeAudioData(ab);
+    } catch (_) {}
+  }));
+})();
 
-// STRINGS (Violin section)
-// Triangle wave approximates the bowed string harmonic spectrum (rough, not sine)
-// Slow attack simulates bow catching the string
-const strings = new Tone.PolySynth(Tone.Synth, {
-  oscillator: { type: 'triangle' },
-  envelope: { attack: 0.8, decay: 0.2, sustain: 0.95, release: 1.5 },
-  volume: -5,
-}).connect(reverb);
+// Inside main() — await ready, wrap buffers, build instruments
+async function main() {
+  await Tone.start();
+  await window.TUNEFRAMES_READY;
 
-// BRASS (French horns / Trumpets)
-// Sawtooth gives the harmonic richness of a brass instrument
-// Medium attack = breath control into tone
-const brass = new Tone.PolySynth(Tone.Synth, {
-  oscillator: { type: 'sawtooth' },
-  envelope: { attack: 0.35, decay: 0.3, sustain: 0.75, release: 1.0 },
-  volume: -9,
-}).connect(reverb);
+  const reverb = new Tone.Reverb({ decay: 3.5, preDelay: 0.05, wet: 0.7 });
+  await reverb.generate();
+  reverb.toDestination();
 
-// WOODWINDS (Oboe / Flute color)
-// AMSynth provides the reedy, breathy quality
-const woodwinds = new Tone.AMSynth({
-  harmonicity: 1,
-  oscillator: { type: 'triangle' },
-  envelope: { attack: 0.15, decay: 0.1, sustain: 0.85, release: 0.6 },
-  modulation: { type: 'square' },
-  modulationEnvelope: { attack: 0.5, decay: 0.0, sustain: 0.3, release: 0.5 },
-  volume: -16,
-}).connect(reverb);
+  // STRINGS — string_ensemble_1 Sampler (polyphonic, slow bow-attack)
+  const strUrls = {};
+  for (const [n, buf] of Object.entries(window._strBufs || {}))
+    strUrls[n] = new Tone.ToneAudioBuffer(buf);
+  const strings = new Tone.Sampler({ urls: strUrls, attack: 0.75, release: 1.5, volume: -5 });
+  strings.connect(reverb);
 
-// TIMPANI
-// MembraneSynth: pitchDecay simulates the drum head ringing
-const timpani = new Tone.MembraneSynth({
-  pitchDecay: 0.35, octaves: 5,
-  envelope: { attack: 0.001, decay: 1.5, sustain: 0, release: 1.0 },
-  volume: -7,
-}).connect(reverb);
+  // BRASS — trumpet Sampler (polyphonic, supports chord arrays)
+  const brassUrls = {};
+  for (const [n, buf] of Object.entries(window._brassBufs || {}))
+    brassUrls[n] = new Tone.ToneAudioBuffer(buf);
+  const brass = new Tone.Sampler({ urls: brassUrls, attack: 0.32, release: 1.0, volume: -10 });
+  brass.connect(reverb);
+
+  // WOODWINDS — flute Sampler
+  const fluteUrls = {};
+  for (const [n, buf] of Object.entries(window._fluteBufs || {}))
+    fluteUrls[n] = new Tone.ToneAudioBuffer(buf);
+  const woodwinds = new Tone.Sampler({ urls: fluteUrls, attack: 0.14, release: 0.6, volume: -16 });
+  woodwinds.connect(reverb);
+
+  // TIMPANI — MembraneSynth (no CDN sample; pitchDecay simulates drum head ring)
+  const timpani = new Tone.MembraneSynth({
+    pitchDecay: 0.35, octaves: 5,
+    envelope: { attack: 0.001, decay: 1.5, sustain: 0, release: 1.0 },
+    volume: -7,
+  }).connect(reverb);
+}
 ```
 
 ## Composition Structure

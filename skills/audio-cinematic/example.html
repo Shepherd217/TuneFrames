@@ -7,6 +7,54 @@
 <body>
   <div id="tuneframes" style="display:none">{"bpm":72,"duration":"15s"}</div>
   <script>
+    // Pre-fetch CDN samples in the online context before render.js calls Tone.Offline().
+    // render.js awaits this promise before starting the offline render.
+    // AudioBuffer objects decoded here are valid inside the offline context (Web Audio §6.1).
+    window.TUNEFRAMES_READY = (async () => {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+      window._stringBufs  = {};
+      window._trumpetBufs = {};
+      window._pianoBufs   = {};
+
+      const fetchBuf = async (url) => {
+        const ab = await (await fetch(url)).arrayBuffer();
+        return ctx.decodeAudioData(ab);
+      };
+
+      await Promise.all([
+        // String ensemble (gleitz FluidR3_GM — flat notation, covers Dm–Bb–F–C range)
+        ...['G2','A2','C3','D3','E3','G3','A3','C4'].map(async n => {
+          try {
+            window._stringBufs[n] = await fetchBuf(
+              'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/string_ensemble_1-mp3/' + n + '.mp3'
+            );
+          } catch(_) {}
+        }),
+
+        // Trumpet (gleitz FluidR3_GM — flat notation, covers F3–F4 brass swell range)
+        ...['C3','D3','G3','A3','C4'].map(async n => {
+          try {
+            window._trumpetBufs[n] = await fetchBuf(
+              'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/trumpet-mp3/' + n + '.mp3'
+            );
+          } catch(_) {}
+        }),
+
+        // Salamander Grand Piano (tonejs CDN — sharp 's' suffix in filenames, covers F1–D2)
+        ...Object.entries({
+          'A1':'A1.mp3', 'C2':'C2.mp3', 'D#2':'Ds2.mp3',
+          'F#2':'Fs2.mp3', 'A2':'A2.mp3', 'C3':'C3.mp3'
+        }).map(async ([note, file]) => {
+          try {
+            window._pianoBufs[note] = await fetchBuf(
+              'https://tonejs.github.io/audio/salamander/' + file
+            );
+          } catch(_) {}
+        }),
+      ]);
+    })();
+
     async function main() {
       await Tone.start();
       Tone.Transport.bpm.value = 72;
@@ -32,12 +80,13 @@
       // Dm open fifth — ethereal, thin, creates space
       choir.triggerAttackRelease(['D3','A3'], '2n', 0);
 
-      // ── Strings — slow attack swell ──────────────────────────────────────
-      const strings = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'sawtooth' },
-        envelope: { attack: 2.0, decay: 0.5, sustain: 0.85, release: 5.0 }
-      }).connect(hall);
-      strings.volume.value = -16;
+      // ── Strings — real string ensemble samples ────────────────────────────
+      const stringUrls = {};
+      for (const [note, buf] of Object.entries(window._stringBufs || {})) {
+        stringUrls[note] = new Tone.ToneAudioBuffer(buf);
+      }
+      const strings = new Tone.Sampler({ urls: stringUrls, attack: 0.5, release: 5.0 }).connect(hall);
+      strings.volume.value = -14;
 
       // Dm – Bb – F – C (the cinematic minor-to-relative-major arc)
       const prog = [
@@ -65,11 +114,12 @@
       const ostinato3 = ['F2','C3','F3','C3','F2','C3','G2','C3'];
       ostinato3.forEach((n, i) => cello.triggerAttackRelease(n, '8n', bar * 3 + i * (q * 0.5)));
 
-      // ── Low piano (enters bar 1, punctuates downbeats) ───────────────────
-      const piano = new Tone.Synth({
-        oscillator: { type: 'sine' },
-        envelope: { attack: 0.01, decay: 1.2, sustain: 0.1, release: 2.0 }
-      }).connect(room);
+      // ── Low piano — Salamander Grand (punctuates downbeats) ──────────────
+      const pianoUrls = {};
+      for (const [note, buf] of Object.entries(window._pianoBufs || {})) {
+        pianoUrls[note] = new Tone.ToneAudioBuffer(buf);
+      }
+      const piano = new Tone.Sampler({ urls: pianoUrls, attack: 0.01, release: 2.0 }).connect(room);
       piano.volume.value = -14;
 
       piano.triggerAttackRelease('D2', '2n', 0);
@@ -97,12 +147,13 @@
       ];
       soloPhrase.forEach(({ note, time, dur }) => solo.triggerAttackRelease(note, dur, time));
 
-      // ── Brass swell (enters bar 3 — the climax) ──────────────────────────
-      const brass = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'sawtooth' },
-        envelope: { attack: 0.5, decay: 0.3, sustain: 0.85, release: 3.0 }
-      }).connect(hall);
-      brass.volume.value = -20;
+      // ── Brass — real trumpet samples (swell enters bar 3) ────────────────
+      const trumpetUrls = {};
+      for (const [note, buf] of Object.entries(window._trumpetBufs || {})) {
+        trumpetUrls[note] = new Tone.ToneAudioBuffer(buf);
+      }
+      const brass = new Tone.Sampler({ urls: trumpetUrls, attack: 0.5, release: 3.0 }).connect(hall);
+      brass.volume.value = -18;
 
       brass.triggerAttackRelease(['F3','A3','C4','F4'], '2n', bar * 2);
       brass.triggerAttackRelease(['C3','G3','C4','E4'], '1n', bar * 3);

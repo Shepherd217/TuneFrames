@@ -8,7 +8,7 @@ description: Jazz — ii-V-I changes, extended chords, walking bass, swing feel,
 ## Genre Profile
 - BPM range: 100–180 (ballad 60–90, bebop 180–240)
 - Key characteristics: ii-V-I progressions, extended/altered chords (maj7, min7, dom7, dim7), swing 8th notes, call-and-response phrasing
-- Typical instruments: Piano (PolySynth), walking upright bass (Synth sine), ride cymbal (MetalSynth), brush snare (NoiseSynth), optional vibraphone
+- Typical instruments: Piano (Sampler — Salamander Grand CDN), walking upright bass (Sampler — acoustic_bass CDN), tenor sax melody (Sampler — tenor_sax CDN), ride cymbal (MetalSynth), brush snare (NoiseSynth)
 - Mood: Sophisticated, improvisatory, warm, intellectually alive
 
 ## Core Pattern

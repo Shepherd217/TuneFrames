@@ -7,23 +7,66 @@
 <body>
   <div id="tuneframes" style="display:none">{"bpm":132,"duration":"12s"}</div>
   <script>
+    // Pre-fetch CDN samples in an online AudioContext before Tone.Offline starts.
+    // render.js awaits this Promise before calling main() inside Tone.Offline.
+    window.TUNEFRAMES_READY = (async () => {
+      const ctx = new AudioContext();
+
+      // Salamander Grand piano — CDN filenames use 's' for sharp (Ds2.mp3 = D#2).
+      // Store buffers under standard Tone.js note names (D#2, F#2) so Tone.Sampler accepts them.
+      const PIANO_NOTES = ['A1','C2','Ds2','Fs2','A2','C3','Ds3','Fs3','A3','C4','Ds4','Fs4','A4','C5'];
+      const pianoBufs = {};
+      for (const note of PIANO_NOTES) {
+        const res = await fetch('https://tonejs.github.io/audio/salamander/' + note + '.mp3');
+        const arr = await res.arrayBuffer();
+        pianoBufs[note.replace('Ds', 'D#').replace('Fs', 'F#')] = await ctx.decodeAudioData(arr);
+      }
+      window._pianoBufs = pianoBufs;
+
+      // Acoustic upright bass — gleitz FluidR3_GM, flat notation (Bb, Db, Eb, Ab)
+      const BASS_NOTES = ['A1','Bb1','B1','C2','Db2','D2','Eb2','E2','F2','G2','Ab2','A2','B2','C3','Db3','D3','E3','F3','G3'];
+      const bassBufs = {};
+      for (const note of BASS_NOTES) {
+        const res = await fetch('https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_bass-mp3/' + note + '.mp3');
+        const arr = await res.arrayBuffer();
+        bassBufs[note] = await ctx.decodeAudioData(arr);
+      }
+      window._bassBufs = bassBufs;
+
+      // Tenor saxophone — gleitz FluidR3_GM, flat notation
+      const SAX_NOTES = ['C3','D3','E3','F3','G3','A3','B3','C4','Db4','D4','Eb4','E4','F4','G4','Ab4','A4','B4','C5','D5'];
+      const saxBufs = {};
+      for (const note of SAX_NOTES) {
+        const res = await fetch('https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/tenor_sax-mp3/' + note + '.mp3');
+        const arr = await res.arrayBuffer();
+        saxBufs[note] = await ctx.decodeAudioData(arr);
+      }
+      window._saxBufs = saxBufs;
+
+      await ctx.close();
+    })();
+
     async function main() {
       await Tone.start();
+      // Ensure samples are decoded before any Sampler is created
+      await window.TUNEFRAMES_READY;
+
       Tone.Transport.bpm.value = 132;
 
       // ── Effects ─────────────────────────────────────────────────────────
       const reverb = new Tone.Reverb({ decay: 1.6, preDelay: 0.01, wet: 0.28 }).toDestination();
       await reverb.ready;
 
-      // ── Piano — shell voicings (3rd + 7th on top) ───────────────────────
-      const piano = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'triangle' },
-        envelope: { attack: 0.008, decay: 0.35, sustain: 0.5, release: 1.4 }
-      }).connect(reverb);
-      piano.volume.value = -10;
-
       const bar = Tone.Time('1n').toSeconds();
       const q   = Tone.Time('4n').toSeconds();
+
+      // ── Piano — Salamander Grand, shell voicings (3rd + 7th on top) ─────
+      const pianoUrls = {};
+      for (const [note, buf] of Object.entries(window._pianoBufs)) {
+        pianoUrls[note] = new Tone.ToneAudioBuffer(buf);
+      }
+      const piano = new Tone.Sampler({ urls: pianoUrls, attack: 0.008, release: 1.4 }).connect(reverb);
+      piano.volume.value = -10;
 
       // ii–V–I–vi turnaround in C major (2 full passes = 8 bars)
       // Bar layout: Dm7 | G7 | Cmaj7 | Am7 | repeat
@@ -43,15 +86,16 @@
         t += Tone.Time(dur).toSeconds();
       });
 
-      // ── Walking bass ────────────────────────────────────────────────────
-      const bass = new Tone.Synth({
-        oscillator: { type: 'sine' },
-        envelope: { attack: 0.008, decay: 0.09, sustain: 0.55, release: 0.15 }
-      }).connect(reverb);
+      // ── Walking bass — acoustic_bass samples ─────────────────────────────
+      const bassUrls = {};
+      for (const [note, buf] of Object.entries(window._bassBufs)) {
+        bassUrls[note] = new Tone.ToneAudioBuffer(buf);
+      }
+      const bass = new Tone.Sampler({ urls: bassUrls, attack: 0.008, release: 0.15 }).connect(reverb);
       bass.volume.value = -6;
 
-      // 8-bar walking line (one note per beat = 32 quarter notes)
-      const walkLine = [
+      // 8-bar walking line (one note per beat = 32 quarter notes), sorted chronologically
+      const walkNotes = [
         // Bar 1 Dm7
         'D2','F2','A2','C3',
         // Bar 2 G7
@@ -69,7 +113,8 @@
         // Bar 8 G7
         'G2','Ab2','A2','B2',
       ];
-      walkLine.forEach((n, i) => bass.triggerAttackRelease(n, '4n', i * q));
+      const walkEvents = walkNotes.map((note, i) => ({ note, t: i * q })).sort((a, b) => a.t - b.t);
+      walkEvents.forEach(({ note, t }) => bass.triggerAttackRelease(note, '4n', t));
 
       // ── Ride cymbal (jazz swing pattern) ────────────────────────────────
       const ride = new Tone.MetalSynth({
@@ -102,14 +147,15 @@
         snare.triggerAttackRelease('8n', b * bar + q * 3);   // beat 4
       }
 
-      // ── Bebop melody (enters bar 3) ─────────────────────────────────────
-      const melody = new Tone.Synth({
-        oscillator: { type: 'triangle' },
-        envelope: { attack: 0.005, decay: 0.15, sustain: 0.4, release: 0.5 }
-      }).connect(reverb);
+      // ── Bebop melody — tenor sax samples ────────────────────────────────
+      const saxUrls = {};
+      for (const [note, buf] of Object.entries(window._saxBufs)) {
+        saxUrls[note] = new Tone.ToneAudioBuffer(buf);
+      }
+      const melody = new Tone.Sampler({ urls: saxUrls, attack: 0.005, release: 0.5 }).connect(reverb);
       melody.volume.value = -12;
 
-      // Classic bebop phrase: arpeggiated chords + chromatic passing tones
+      // Classic bebop phrase: arpeggiated chords + chromatic passing tones, sorted chronologically
       const phrase = [
         // Over Cmaj7 (bar 3)
         { note: 'G4',  time: bar * 2,             dur: '8n' },
@@ -138,7 +184,7 @@
         { note: 'F4',  time: bar * 5 + q * 0.5,  dur: '8n' },
         { note: 'Db4', time: bar * 5 + q,         dur: '4n' },
         { note: 'C4',  time: bar * 5 + q * 2,     dur: '2n' }, // resolve to C
-      ];
+      ].sort((a, b) => a.time - b.time);
       phrase.forEach(({ note, time, dur }) => melody.triggerAttackRelease(note, dur, time));
     }
   </script>

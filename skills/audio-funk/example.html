@@ -7,8 +7,55 @@
 <body>
   <div id="tuneframes" style="display:none">{"bpm":104,"duration":"12s"}</div>
   <script>
+    // Pre-fetch CDN samples before render.js calls Tone.Offline().
+    // render.js awaits window.TUNEFRAMES_READY before starting the render.
+    // AudioBuffer objects decoded in the online context are context-agnostic
+    // (Web Audio API spec §6.1) and work inside the offline render.
+    window.TUNEFRAMES_READY = (async () => {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      window._funk_drums    = {};
+      window._funk_bass     = {};
+      window._funk_trumpet  = {};
+
+      // CR78 drum samples (Tone.js CDN)
+      for (const [name, url] of Object.entries({
+        kick:  'https://tonejs.github.io/audio/drum-samples/CR78/kick.mp3',
+        snare: 'https://tonejs.github.io/audio/drum-samples/CR78/snare.mp3',
+        hihat: 'https://tonejs.github.io/audio/drum-samples/CR78/hihat.mp3',
+      })) {
+        try {
+          const arr = await (await fetch(url)).arrayBuffer();
+          window._funk_drums[name] = await ctx.decodeAudioData(arr);
+        } catch (_) {}
+      }
+
+      // Electric bass finger samples (gleitz FluidR3_GM — flat notation, NOT sharp)
+      await Promise.all(['C2','D2','E2','F2','Gb2','G2','Ab2','A2','B2','C3'].map(async note => {
+        try {
+          const arr = await (await fetch(
+            'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/electric_bass_finger-mp3/' + note + '.mp3'
+          )).arrayBuffer();
+          window._funk_bass[note] = await ctx.decodeAudioData(arr);
+        } catch (_) {}
+      }));
+
+      // Trumpet samples (gleitz FluidR3_GM — flat notation, NOT sharp)
+      await Promise.all(['C3','E3','G3','A3','Bb3','C4','D4','E4','F4','G4','A4','B4','C5'].map(async note => {
+        try {
+          const arr = await (await fetch(
+            'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/trumpet-mp3/' + note + '.mp3'
+          )).arrayBuffer();
+          window._funk_trumpet[note] = await ctx.decodeAudioData(arr);
+        } catch (_) {}
+      }));
+
+      await ctx.close();
+    })();
+
     async function main() {
       await Tone.start();
+      await window.TUNEFRAMES_READY;
+
       Tone.Transport.bpm.value = 104;
 
       const s16 = Tone.Time('16n').toSeconds(); // ~0.144s
@@ -19,31 +66,35 @@
       const comp = new Tone.Compressor({ threshold: -16, ratio: 4, attack: 0.003, release: 0.12 }).toDestination();
       const room = new Tone.Reverb({ decay: 0.6, wet: 0.12 }).connect(comp);
 
-      // ── Slap bass ───────────────────────────────────────────────────────
+      // ── Slap bass (electric_bass_finger samples) ─────────────────────────
+      const bassUrls = {};
+      for (const [note, buf] of Object.entries(window._funk_bass)) {
+        bassUrls[note] = new Tone.ToneAudioBuffer(buf);
+      }
       const bassFilter = new Tone.Filter(800, 'lowpass').connect(comp);
-      const bass = new Tone.Synth({
-        oscillator: { type: 'square' },
-        envelope: { attack: 0.001, decay: 0.09, sustain: 0.0, release: 0.04 }
-      }).connect(bassFilter);
+      const bass = new Tone.Sampler({ urls: bassUrls }).connect(bassFilter);
       bass.volume.value = -4;
 
       // One-bar groove in E — repeated 5 times
       const bassPattern = [
-        { note: 'E2',  t: 0      },
-        { note: 'E2',  t: s16*2  },
-        { note: 'G2',  t: s16*3  },
-        { note: 'E2',  t: s16*4  },
-        { note: 'A2',  t: s16*6  },
-        { note: 'E2',  t: s16*8  },
-        { note: 'D2',  t: s16*10 },
-        { note: 'E2',  t: s16*12 },
-        { note: 'Gb2', t: s16*14 },
+        { note: 'E2',  t: 0       },
+        { note: 'E2',  t: s16 * 2 },
+        { note: 'G2',  t: s16 * 3 },
+        { note: 'E2',  t: s16 * 4 },
+        { note: 'A2',  t: s16 * 6 },
+        { note: 'E2',  t: s16 * 8 },
+        { note: 'D2',  t: s16 * 10 },
+        { note: 'E2',  t: s16 * 12 },
+        { note: 'Gb2', t: s16 * 14 },
       ];
+      const allBassEvents = [];
       for (let rep = 0; rep < 5; rep++) {
-        bassPattern.forEach(({ note, t }) => bass.triggerAttackRelease(note, '16n', rep * bar + t));
+        bassPattern.forEach(({ note, t }) => allBassEvents.push({ note, t: rep * bar + t }));
       }
+      allBassEvents.sort((a, b) => a.t - b.t);
+      allBassEvents.forEach(e => bass.triggerAttackRelease(e.note, '16n', e.t));
 
-      // ── Rhythm guitar chank (bandpass, hits on upbeats) ─────────────────
+      // ── Rhythm guitar chank (bandpass, hits on upbeats) — kept as synth ──
       const guitFilter = new Tone.Filter(2200, 'bandpass').connect(room);
       const guitar = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: 'triangle' },
@@ -52,93 +103,90 @@
       guitar.volume.value = -14;
 
       // Chank on "and" of 2 (s16*9) and "and" of 4 (s16*13) — classic funk chop
-      const chankTimes = [s16 * 9, s16 * 13];
+      const allGuitarEvents = [];
       for (let rep = 0; rep < 5; rep++) {
-        chankTimes.forEach(t => {
-          guitar.triggerAttackRelease(['E4','G4','B4'], '16n', rep * bar + t);
-        });
+        [s16 * 9, s16 * 13].forEach(t => allGuitarEvents.push({ t: rep * bar + t }));
       }
+      allGuitarEvents.sort((a, b) => a.t - b.t);
+      allGuitarEvents.forEach(e => guitar.triggerAttackRelease(['E4', 'G4', 'B4'], '16n', e.t));
 
-      // ── Brass stabs (upbeat, punchy) ────────────────────────────────────
+      // ── Brass stabs (trumpet samples, upbeat punchy) ─────────────────────
+      const trumpetUrls = {};
+      for (const [note, buf] of Object.entries(window._funk_trumpet)) {
+        trumpetUrls[note] = new Tone.ToneAudioBuffer(buf);
+      }
       const brassFilter = new Tone.Filter(4000, 'lowpass').connect(room);
-      const brass = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'sawtooth' },
-        envelope: { attack: 0.006, decay: 0.13, sustain: 0.0, release: 0.07 }
-      }).connect(brassFilter);
+      const brass = new Tone.Sampler({ urls: trumpetUrls }).connect(brassFilter);
       brass.volume.value = -10;
 
       // Stabs enter on bar 2 — same upbeat timing as guitar chank
+      const allBrassEvents = [];
       for (let rep = 1; rep < 5; rep++) {
         [s16 * 9, s16 * 13].forEach(t => {
-          brass.triggerAttackRelease(['E4','G4','B4'], '16n', rep * bar + t);
+          allBrassEvents.push({ notes: ['E4', 'G4', 'B4'], t: rep * bar + t });
           // Second stab chord a beat later for call-and-response
-          brass.triggerAttackRelease(['D4','F4','A4'], '16n', rep * bar + t + s16 * 2);
+          allBrassEvents.push({ notes: ['D4', 'F4', 'A4'], t: rep * bar + t + s16 * 2 });
         });
       }
+      allBrassEvents.sort((a, b) => a.t - b.t);
+      allBrassEvents.forEach(e => brass.triggerAttackRelease(e.notes, '16n', e.t));
 
-      // ── Kick drum ───────────────────────────────────────────────────────
-      const kick = new Tone.MembraneSynth({
-        pitchDecay: 0.04, octaves: 6,
-        envelope: { attack: 0.001, decay: 0.22, sustain: 0, release: 0.08 }
-      }).connect(comp);
+      // ── Kick drum (CR78 sample) ───────────────────────────────────────────
+      const kick = new Tone.Player(new Tone.ToneAudioBuffer(window._funk_drums.kick)).connect(comp);
       kick.volume.value = -8;
 
       // Kick pattern: beat 1, then syncopated 16th before beat 3 and on the "a" of 3
+      const allKickTimes = [];
       for (let rep = 0; rep < 5; rep++) {
-        kick.triggerAttackRelease('C1', '8n', rep * bar);           // beat 1
-        kick.triggerAttackRelease('C1', '8n', rep * bar + s16 * 7); // "and-a" of 2
-        kick.triggerAttackRelease('C1', '8n', rep * bar + s16 * 10); // "and" of 3
+        allKickTimes.push(rep * bar, rep * bar + s16 * 7, rep * bar + s16 * 10);
       }
+      allKickTimes.sort((a, b) => a - b);
+      allKickTimes.forEach(t => Tone.Transport.schedule(time => kick.start(time), t));
 
-      // ── Snare on 2 and 4 (with ghost notes) ────────────────────────────
-      const snareBp  = new Tone.Filter(3200, 'bandpass').connect(room);
-      const snare    = new Tone.NoiseSynth({
-        noise: { type: 'white' },
-        envelope: { attack: 0.001, decay: 0.11, sustain: 0, release: 0.04 }
-      }).connect(snareBp);
+      // ── Snare on 2 and 4 with ghost notes (CR78 sample) ─────────────────
+      const snareBp    = new Tone.Filter(3200, 'bandpass').connect(room);
+      const snare      = new Tone.Player(new Tone.ToneAudioBuffer(window._funk_drums.snare)).connect(snareBp);
       snare.volume.value = -12;
 
-      const ghostSnare = new Tone.NoiseSynth({
-        noise: { type: 'white' },
-        envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 }
-      }).connect(snareBp);
+      const ghostSnare = new Tone.Player(new Tone.ToneAudioBuffer(window._funk_drums.snare)).connect(snareBp);
       ghostSnare.volume.value = -26; // quiet ghosts
 
+      const allSnareTimes = [];
+      const allGhostTimes = [];
       for (let rep = 0; rep < 5; rep++) {
-        snare.triggerAttackRelease('8n', rep * bar + q);         // beat 2
-        snare.triggerAttackRelease('8n', rep * bar + q * 3);     // beat 4
+        allSnareTimes.push(rep * bar + q, rep * bar + q * 3);
         // Ghost notes around beat 3
-        ghostSnare.triggerAttackRelease('16n', rep * bar + s16 * 9);
-        ghostSnare.triggerAttackRelease('16n', rep * bar + s16 * 11);
+        allGhostTimes.push(rep * bar + s16 * 9, rep * bar + s16 * 11);
       }
+      allSnareTimes.sort((a, b) => a - b);
+      allGhostTimes.sort((a, b) => a - b);
+      allSnareTimes.forEach(t => Tone.Transport.schedule(time => snare.start(time), t));
+      allGhostTimes.forEach(t => Tone.Transport.schedule(time => ghostSnare.start(time), t));
 
-      // ── 16th hi-hats ───────────────────────────────────────────────────
-      const hat = new Tone.MetalSynth({
-        frequency: 600, harmonicity: 5.1, modulationIndex: 32,
-        resonance: 4000, octaves: 1.5,
-        envelope: { attack: 0.001, decay: 0.028, release: 0.008 }
-      }).connect(comp);
+      // ── 16th hi-hats (CR78 sample) ────────────────────────────────────────
+      const hat = new Tone.Player(new Tone.ToneAudioBuffer(window._funk_drums.hihat)).connect(comp);
       hat.volume.value = -19;
 
-      // Full 16th grid, slight accent on quarter notes
+      // Full 16th grid
+      const allHatTimes = [];
       for (let rep = 0; rep < 5; rep++) {
-        for (let i = 0; i < 16; i++) {
-          hat.triggerAttackRelease('32n', rep * bar + i * s16);
-        }
+        for (let i = 0; i < 16; i++) allHatTimes.push(rep * bar + i * s16);
       }
+      allHatTimes.sort((a, b) => a - b);
+      allHatTimes.forEach(t => Tone.Transport.schedule(time => hat.start(time), t));
 
-      // ── Open hi-hat accent on beat 4 of every other bar ────────────────
-      const openHat = new Tone.MetalSynth({
-        frequency: 400, harmonicity: 3.1, modulationIndex: 12,
-        resonance: 2000, octaves: 1.0,
-        envelope: { attack: 0.001, decay: 0.22, release: 0.08 }
-      }).connect(room);
+      // ── Open hi-hat accent on beat 4 of every other bar ─────────────────
+      const openHat = new Tone.Player(new Tone.ToneAudioBuffer(window._funk_drums.hihat)).connect(room);
       openHat.volume.value = -18;
 
+      const allOpenHatTimes = [];
       for (let rep = 1; rep < 5; rep += 2) {
-        openHat.triggerAttackRelease('8n', rep * bar + q * 3);
+        allOpenHatTimes.push(rep * bar + q * 3);
       }
+      allOpenHatTimes.sort((a, b) => a - b);
+      allOpenHatTimes.forEach(t => Tone.Transport.schedule(time => openHat.start(time), t));
     }
+    main();
   </script>
 </body>
 </html>

@@ -8,7 +8,7 @@ description: Funk — slap bass, brass stabs, 16th-note hi-hats, syncopated groo
 ## Genre Profile
 - BPM range: 95–115 (the pocket lives around 100–108)
 - Key characteristics: Syncopated 16th-note grid, everything lands on or anticipates the beat, brass stabs on upbeats, rhythm guitar "chank" on the "and" of 2 and 4, bass owns the low end
-- Typical instruments: Slap bass (Synth with fast attack + filter), brass stabs (PolySynth sawtooth, sharp envelope), rhythm guitar (PolySynth pluck), kick (MembraneSynth), tight snare (NoiseSynth), 16th hi-hats (MetalSynth)
+- Typical instruments: Slap bass (electric_bass_finger CDN samples via gleitz FluidR3_GM), brass stabs (trumpet CDN samples via gleitz FluidR3_GM), rhythm guitar (PolySynth pluck, synth), kick/snare/hihat (CR78 drum samples via Tone.js CDN)
 - Mood: Infectious, locked-in, body-moving, celebratory — James Brown, Parliament, Daft Punk, Vulfpeck
 
 ## Core Pattern

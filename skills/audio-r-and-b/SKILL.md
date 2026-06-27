@@ -8,7 +8,9 @@ description: R&B / Neo-Soul — lush extended chords, smooth Rhodes, laid-back s
 ## Genre Profile
 - BPM range: 70–95 (the groove breathes; never rushed)
 - Key characteristics: Extended chord voicings (min9, maj9, add9, 11ths), Rhodes/electric piano feel, laid-back beat placement (drums sit just behind the grid), syncopated bass that locks with the kick, gentle compression on everything
-- Typical instruments: Rhodes (PolySynth triangle), warm bass (Synth sine), soft kick (MembraneSynth), brush snare (NoiseSynth), 8th hi-hats with occasional 16th fills, optional synth pad underneath
+- Typical instruments: Salamander Grand piano (Tone.Sampler, CDN), fingered electric bass (FluidR3_GM Sampler, CDN), CR78 kick/snare/hihat (Tone.Player, CDN), synth pad underneath (PolySynth sine — kept as synth), synth melody lead (Synth triangle — kept as synth)
+- CDN sources: Salamander piano at `https://tonejs.github.io/audio/salamander/`, FluidR3_GM bass at `https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/electric_bass_finger-mp3/`, CR78 drums at `https://tonejs.github.io/audio/drum-samples/CR78/`
+- Requires `window.TUNEFRAMES_READY` pre-fetch pattern — see example.html
 - Mood: Warm, sensual, introspective, polished — D'Angelo, H.E.R., Frank Ocean, Erykah Badu, Sade
 
 ## Core Pattern

@@ -7,8 +7,68 @@
 <body>
   <div id="tuneframes" style="display:none">{"bpm":80,"duration":"12s"}</div>
   <script>
+    // Pre-fetch all CDN samples before render.js calls Tone.Offline().
+    // AudioBuffer objects decoded in an online AudioContext remain valid
+    // when wrapped as ToneAudioBuffer inside the offline render context.
+    window.TUNEFRAMES_READY = (async () => {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+      // ── Piano: Salamander Grand ─────────────────────────────────────────
+      // Covers the full chord voicing range (C3–G4) with interpolation headroom
+      const PIANO_FILES = {
+        'A2':  'A2.mp3',
+        'C3':  'C3.mp3',
+        'Eb3': 'Ds3.mp3',
+        'F#3': 'Fs3.mp3',
+        'A3':  'A3.mp3',
+        'C4':  'C4.mp3',
+        'Eb4': 'Ds4.mp3',
+        'F#4': 'Fs4.mp3',
+        'A4':  'A4.mp3',
+        'C5':  'C5.mp3',
+      };
+      window._pianoBufs = {};
+      await Promise.all(Object.entries(PIANO_FILES).map(async ([note, file]) => {
+        try {
+          const ab = await (await fetch('https://tonejs.github.io/audio/salamander/' + file)).arrayBuffer();
+          window._pianoBufs[note] = await ctx.decodeAudioData(ab);
+        } catch (_) {}
+      }));
+
+      // ── Bass: gleitz electric_bass_finger (flat notation — sharps return 404) ──
+      // Covers walking bass range: C2–C3, all confirmed 200 OK
+      const BASS_NOTES = ['A1', 'C2', 'E2', 'F2', 'G2', 'A2', 'C3'];
+      window._bassBufs = {};
+      await Promise.all(BASS_NOTES.map(async note => {
+        try {
+          const ab = await (await fetch(
+            'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/electric_bass_finger-mp3/' + note + '.mp3'
+          )).arrayBuffer();
+          window._bassBufs[note] = await ctx.decodeAudioData(ab);
+        } catch (_) {}
+      }));
+
+      // ── Drums: CR78 one-shots ───────────────────────────────────────────
+      const DRUM_URLS = {
+        kick:  'https://tonejs.github.io/audio/drum-samples/CR78/kick.mp3',
+        snare: 'https://tonejs.github.io/audio/drum-samples/CR78/snare.mp3',
+        hihat: 'https://tonejs.github.io/audio/drum-samples/CR78/hihat.mp3',
+      };
+      window._drumBufs = {};
+      await Promise.all(Object.entries(DRUM_URLS).map(async ([name, url]) => {
+        try {
+          const ab = await (await fetch(url)).arrayBuffer();
+          window._drumBufs[name] = await ctx.decodeAudioData(ab);
+        } catch (_) {}
+      }));
+
+      await ctx.close();
+    })();
+
     async function main() {
       await Tone.start();
+      await window.TUNEFRAMES_READY; // already resolved; safety gate inside Offline context
+
       Tone.Transport.bpm.value = 80;
 
       // ── Effects chain ───────────────────────────────────────────────────
@@ -18,16 +78,17 @@
       const tape     = new Tone.Distortion(0.04).connect(lpFilter);
 
       // ── Soft pink noise (vinyl warmth) ──────────────────────────────────
-      const noiseLp   = new Tone.Filter(600, 'lowpass').connect(reverb);
+      const noiseLp    = new Tone.Filter(600, 'lowpass').connect(reverb);
       const vinylNoise = new Tone.Noise('pink').connect(noiseLp);
       vinylNoise.volume.value = -42;
       vinylNoise.start(0).stop('+12');
 
-      // ── Rhodes-style keys ───────────────────────────────────────────────
-      const keys = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'triangle' },
-        envelope: { attack: 0.05, decay: 0.3, sustain: 0.7, release: 2.0 }
-      }).connect(tape);
+      // ── Rhodes-style keys: Salamander Grand sampler ─────────────────────
+      const pianoUrls = {};
+      for (const [note, buf] of Object.entries(window._pianoBufs || {})) {
+        pianoUrls[note] = new Tone.ToneAudioBuffer(buf);
+      }
+      const keys = new Tone.Sampler({ urls: pianoUrls, attack: 0.05, release: 2.0 }).connect(tape);
       keys.volume.value = -10;
 
       // Am7 – Fmaj7 – Cmaj7 – G7
@@ -38,77 +99,84 @@
         ['G3','B3','D4','F4'],
       ];
 
-      // 2 beats per chord at 80 BPM = 1.5s per chord
+      // 2 beats per chord at 80 BPM = 1.5s per chord — schedule both passes
+      // sorted chronologically to avoid StateTimeline ordering issues
       const step = Tone.Time('2n').toSeconds();
-      chords.forEach((ch, i) => keys.triggerAttackRelease(ch, '2n', i * step));
-      // Second pass — loop the chords again from 6s
-      chords.forEach((ch, i) => keys.triggerAttackRelease(ch, '2n', 6 + i * step));
+      const chordEvents = [];
+      chords.forEach((ch, i) => {
+        chordEvents.push({ ch, t: i * step });
+        chordEvents.push({ ch, t: 6 + i * step });
+      });
+      chordEvents.sort((a, b) => a.t - b.t);
+      chordEvents.forEach(({ ch, t }) => keys.triggerAttackRelease(ch, '2n', t));
 
-      // ── Walking bass ────────────────────────────────────────────────────
+      // ── Walking bass: electric_bass_finger sampler ──────────────────────
+      const bassUrls = {};
+      for (const [note, buf] of Object.entries(window._bassBufs || {})) {
+        bassUrls[note] = new Tone.ToneAudioBuffer(buf);
+      }
       const bassFilter = new Tone.Filter(600, 'lowpass').connect(reverb);
-      const bass = new Tone.Synth({
-        oscillator: { type: 'sine' },
-        envelope: { attack: 0.02, decay: 0.12, sustain: 0.5, release: 0.5 }
-      }).connect(bassFilter);
+      const bass = new Tone.Sampler({ urls: bassUrls, attack: 0.02, release: 0.5 }).connect(bassFilter);
       bass.volume.value = -6;
 
-      // Root + passing tone on each chord (quarter notes)
+      // Root + passing tone on each chord (quarter notes) — both passes, sorted
       const bassLines = [
         ['A2','C3'],
         ['F2','G2'],
         ['C2','E2'],
         ['G2','A2'],
       ];
+      const bassEvents = [];
       bassLines.forEach(([root, pass], i) => {
-        bass.triggerAttackRelease(root, '4n', i * step);
-        bass.triggerAttackRelease(pass, '4n', i * step + step * 0.5);
+        bassEvents.push({ note: root, t: i * step });
+        bassEvents.push({ note: pass, t: i * step + step * 0.5 });
+        bassEvents.push({ note: root, t: 6 + i * step });
+        bassEvents.push({ note: pass, t: 6 + i * step + step * 0.5 });
       });
-      bassLines.forEach(([root, pass], i) => {
-        bass.triggerAttackRelease(root, '4n', 6 + i * step);
-        bass.triggerAttackRelease(pass, '4n', 6 + i * step + step * 0.5);
-      });
+      bassEvents.sort((a, b) => a.t - b.t);
+      bassEvents.forEach(({ note, t }) => bass.triggerAttackRelease(note, '4n', t));
 
-      // ── Muffled kick ────────────────────────────────────────────────────
+      // ── CR78 kick ───────────────────────────────────────────────────────
       const kickLp = new Tone.Filter(200, 'lowpass').connect(reverb);
-      const kick   = new Tone.MembraneSynth({
-        pitchDecay: 0.05, octaves: 5,
-        envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.4 }
-      }).connect(kickLp);
+      const kick   = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.kick)).connect(kickLp);
       kick.volume.value = -14;
 
       const beat = 60 / 80; // 0.75s
-      // Kick on beats 1 and 3 of each bar (2 bars = 12 beats total)
+      // Kick on beats 1 and 3 of each bar (4 bars total = 12s)
+      const kickTimes = [];
       for (let bar = 0; bar < 4; bar++) {
-        kick.triggerAttackRelease('C1', '8n', bar * beat * 4);
-        kick.triggerAttackRelease('C1', '8n', bar * beat * 4 + beat * 2);
+        kickTimes.push(bar * beat * 4);
+        kickTimes.push(bar * beat * 4 + beat * 2);
       }
+      kickTimes.sort((a, b) => a - b);
+      kickTimes.forEach(t => Tone.Transport.schedule(time => kick.start(time), t));
 
-      // ── Snare (soft) ────────────────────────────────────────────────────
-      const snare = new Tone.NoiseSynth({
-        noise: { type: 'white' },
-        envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.05 }
-      }).connect(new Tone.Filter(3000, 'bandpass').connect(reverb));
+      // ── CR78 snare ──────────────────────────────────────────────────────
+      const snareFlt = new Tone.Filter(3000, 'bandpass').connect(reverb);
+      const snare    = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.snare)).connect(snareFlt);
       snare.volume.value = -22;
 
       // Snare on beats 2 and 4
+      const snareTimes = [];
       for (let bar = 0; bar < 4; bar++) {
-        snare.triggerAttackRelease('8n', bar * beat * 4 + beat);
-        snare.triggerAttackRelease('8n', bar * beat * 4 + beat * 3);
+        snareTimes.push(bar * beat * 4 + beat);
+        snareTimes.push(bar * beat * 4 + beat * 3);
       }
+      snareTimes.sort((a, b) => a - b);
+      snareTimes.forEach(t => Tone.Transport.schedule(time => snare.start(time), t));
 
-      // ── Soft hi-hat (swung 8ths) ────────────────────────────────────────
-      const hat = new Tone.MetalSynth({
-        frequency: 400,
-        envelope: { attack: 0.001, decay: 0.06, release: 0.01 },
-        harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5
-      }).connect(reverb);
+      // ── CR78 hi-hat (swung 8ths) ─────────────────────────────────────────
+      const hat = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.hihat)).connect(reverb);
       hat.volume.value = -28;
 
-      // Swung 8th notes: on beat, then slightly late (lazy swing)
+      // Swung 8th notes: slight delay on offbeats (lazy swing feel)
+      const hatTimes = [];
       for (let i = 0; i < 16; i++) {
-        const swing = (i % 2 === 1) ? 0.05 : 0; // slight swing delay on offbeats
-        hat.triggerAttackRelease('16n', i * beat * 0.5 + swing);
+        const swing = (i % 2 === 1) ? 0.05 : 0;
+        hatTimes.push(i * beat * 0.5 + swing);
       }
+      hatTimes.sort((a, b) => a - b);
+      hatTimes.forEach(t => Tone.Transport.schedule(time => hat.start(time), t));
 
       // ── Melody fragment (enters bar 3, ~4.5s) ───────────────────────────
       const melodyDelay = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.25, wet: 0.3 }).connect(reverb);
@@ -120,11 +188,11 @@
 
       // Simple pentatonic phrase over bars 3–4 (starting at 4.5s)
       const phrase = [
-        { note: 'E5', time: 4.5, dur: '8n' },
-        { note: 'C5', time: 5.0, dur: '8n' },
-        { note: 'A4', time: 5.5, dur: '4n' },
-        { note: 'G4', time: 6.5, dur: '8n' },
-        { note: 'A4', time: 7.0, dur: '4n' },
+        { note: 'E5', time: 4.5,  dur: '8n' },
+        { note: 'C5', time: 5.0,  dur: '8n' },
+        { note: 'A4', time: 5.5,  dur: '4n' },
+        { note: 'G4', time: 6.5,  dur: '8n' },
+        { note: 'A4', time: 7.0,  dur: '4n' },
         { note: 'E5', time: 7.75, dur: '8n' },
         { note: 'C5', time: 8.25, dur: '2n' },
       ];

@@ -8,102 +8,108 @@ description: Lo-fi Hip Hop — dusty jazzy chords, soft keys, muffled drums, chi
 ## Genre Profile
 - BPM range: 70–90
 - Key characteristics: Jazz-adjacent chord progressions (Am–F–C–G or ii–V–I extensions), swung/lazy 8th-note feel, heavy reverb + slight LP filter on everything, vinyl warmth
-- Typical instruments: Rhodes/electric piano (PolySynth triangle/sine), soft bass (Synth), MembraneSynth kick filtered low, closed hi-hat (MetalSynth), pad layer
+- Typical instruments: Salamander Grand piano (Tone.Sampler via tonejs.github.io CDN), electric fingered bass (Tone.Sampler via gleitz FluidR3_GM CDN), CR78 kick/snare/hihat one-shots (Tone.Player via tonejs.github.io CDN), vinyl pink noise (Tone.Noise)
 - Mood: Nostalgic, cozy, introspective, study-focus
+- Sample sources: real CDN audio — requires `window.TUNEFRAMES_READY` pre-fetch pattern (see example.html)
 
 ## Core Pattern
 
+Real CDN samples require the `window.TUNEFRAMES_READY` pre-fetch pattern — see example.html for the full working implementation. Abbreviated structure:
+
 ```js
-// Lo-fi core: 80 BPM, Am–F–C–G, 4 chords × 2 beats each
+// BEFORE main(): pre-fetch all CDN samples into window globals
+window.TUNEFRAMES_READY = (async () => {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  await ctx.resume();
+  // fetch Salamander piano, gleitz electric bass, CR78 drums → store as AudioBuffers
+  // ...see example.html for complete fetch/decode block...
+  await ctx.close();
+})();
+
+// Lo-fi core: 80 BPM, Am7–Fmaj7–Cmaj7–G7, 4 chords × 2 beats each
 async function main() {
   await Tone.start();
+  await window.TUNEFRAMES_READY; // safety gate — already resolved when Offline runs
+
   Tone.Transport.bpm.value = 80;
 
   // ── Effects chain (everything runs warm and muffled) ──────────────────
-  const reverb  = new Tone.Reverb({ decay: 3.5, wet: 0.55 }).toDestination();
+  const reverb   = new Tone.Reverb({ decay: 3.5, wet: 0.55 }).toDestination();
+  await reverb.ready;
   const lpFilter = new Tone.Filter(1800, 'lowpass').connect(reverb);
-  // Optional: slight tape distortion
-  const warm    = new Tone.Distortion(0.04).connect(lpFilter);
+  const warm     = new Tone.Distortion(0.04).connect(lpFilter);
 
-  // ── Rhodes-style chords ───────────────────────────────────────────────
-  const keys = new Tone.PolySynth(Tone.Synth, {
-    oscillator: { type: 'triangle' },
-    envelope: { attack: 0.04, decay: 0.3, sustain: 0.7, release: 1.8 }
-  }).connect(warm);
+  // ── Salamander piano (Tone.Sampler) ───────────────────────────────────
+  const pianoUrls = {};
+  for (const [note, buf] of Object.entries(window._pianoBufs || {})) {
+    pianoUrls[note] = new Tone.ToneAudioBuffer(buf);
+  }
+  const keys = new Tone.Sampler({ urls: pianoUrls, attack: 0.05, release: 2.0 }).connect(warm);
   keys.volume.value = -10;
 
-  // ii–V–I–VI in A minor
+  // Am7–Fmaj7–Cmaj7–G7
+  const step = Tone.Time('2n').toSeconds();
   const chords = [
-    ['A3','C4','E4'],   // Am
-    ['F3','A3','C4'],   // F maj
-    ['C3','E3','G3'],   // C maj
-    ['G3','B3','D4'],   // G maj
+    ['A3','C4','E4','G4'], ['F3','A3','C4','E4'],
+    ['C3','E3','G3','B3'], ['G3','B3','D4','F4'],
   ];
-  const step = Tone.Time('2n').toSeconds(); // 2 beats each chord
-  chords.forEach((ch, i) => keys.triggerAttackRelease(ch, '2n', i * step));
+  // Sort all events chronologically before scheduling
+  const events = [];
+  chords.forEach((ch, i) => events.push({ ch, t: i * step }));
+  events.sort((a, b) => a.t - b.t);
+  events.forEach(({ ch, t }) => keys.triggerAttackRelease(ch, '2n', t));
 
-  // ── Walking bass ──────────────────────────────────────────────────────
-  const bass = new Tone.Synth({
-    oscillator: { type: 'sine' },
-    envelope: { attack: 0.02, decay: 0.1, sustain: 0.5, release: 0.4 }
-  }).connect(lpFilter);
-  bass.volume.value = -8;
+  // ── Electric fingered bass (Tone.Sampler) ─────────────────────────────
+  const bassUrls = {};
+  for (const [note, buf] of Object.entries(window._bassBufs || {})) {
+    bassUrls[note] = new Tone.ToneAudioBuffer(buf);
+  }
+  const bassFilter = new Tone.Filter(600, 'lowpass').connect(reverb);
+  const bass = new Tone.Sampler({ urls: bassUrls, attack: 0.02, release: 0.5 }).connect(bassFilter);
+  bass.volume.value = -6;
 
-  const bassNotes = ['A2', 'F2', 'C2', 'G2'];
-  bassNotes.forEach((n, i) => bass.triggerAttackRelease(n, '4n', i * step));
-
-  // ── Muffled kick (MembraneSynth + deep LP) ────────────────────────────
-  const kickFilter = new Tone.Filter(200, 'lowpass').connect(reverb);
-  const kick = new Tone.MembraneSynth({
-    pitchDecay: 0.05, octaves: 5,
-    envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.4 }
-  }).connect(kickFilter);
+  // ── CR78 drums (Tone.Player — use Tone.Transport.schedule) ────────────
+  const kickLp = new Tone.Filter(200, 'lowpass').connect(reverb);
+  const kick   = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.kick)).connect(kickLp);
   kick.volume.value = -14;
 
-  // Kick on beats 1 and 3 (seconds at 80 BPM: beat = 0.75s)
-  const beat = 60 / 80;
-  [0, beat * 2, beat * 4, beat * 6].forEach(t => kick.triggerAttackRelease('C1', '8n', t));
-
-  // ── Soft hi-hat ───────────────────────────────────────────────────────
-  const hat = new Tone.MetalSynth({
-    frequency: 400, envelope: { attack: 0.001, decay: 0.08, release: 0.01 },
-    harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5
-  }).connect(reverb);
-  hat.volume.value = -24;
-
-  for (let i = 0; i < 8; i++) {
-    hat.triggerAttackRelease('8n', i * beat * 0.5);
-  }
+  const beat = 60 / 80; // 0.75s
+  // Sort times chronologically before scheduling
+  const kickTimes = [0, beat*2, beat*4, beat*6].sort((a, b) => a - b);
+  kickTimes.forEach(t => Tone.Transport.schedule(time => kick.start(time), t));
+  // (Transport auto-starts after main() — events fire at the scheduled offsets)
 }
 ```
 
 ## Instrument Configuration
 
 ```js
-// Rhodes feel — triangle oscillator, slow attack, long release
-const keys = new Tone.PolySynth(Tone.Synth, {
-  oscillator: { type: 'triangle' },
-  envelope: { attack: 0.04, decay: 0.3, sustain: 0.7, release: 1.8 }
-});
+// Salamander Grand — slight fade in/out mimics Rhodes key dynamics
+const keys = new Tone.Sampler({ urls: pianoUrls, attack: 0.05, release: 2.0 });
 
 // Tape warmth — very light distortion before the LP filter
-const tape = new Tone.Distortion(0.04);
-const lp   = new Tone.Filter(1800, 'lowpass');  // cuts harsh highs
-
-// Lush room reverb
+const tape   = new Tone.Distortion(0.04);
+const lp     = new Tone.Filter(1800, 'lowpass');  // cuts harsh highs
 const reverb = new Tone.Reverb({ decay: 3.5, preDelay: 0.01, wet: 0.55 });
 
 // Chain: keys → tape → lp → reverb → destination
 keys.connect(tape); tape.connect(lp); lp.connect(reverb); reverb.toDestination();
 
-// Muffled kick — very tight low-pass (200 Hz)
-const kickLp = new Tone.Filter(200, 'lowpass').toDestination();
-const kick   = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 5 }).connect(kickLp);
+// Electric fingered bass — LP keeps it warm and round
+const bassFilter = new Tone.Filter(600, 'lowpass').connect(reverb);
+const bass = new Tone.Sampler({ urls: bassUrls, attack: 0.02, release: 0.5 }).connect(bassFilter);
 
-// Airy hat — kept very quiet, short decay
-const hat = new Tone.MetalSynth({ frequency: 400, envelope: { decay: 0.08 } });
-hat.volume.value = -24;
-hat.connect(reverb);
+// CR78 kick — muffled below 200 Hz for that dusty thump
+const kickLp = new Tone.Filter(200, 'lowpass').connect(reverb);
+const kick   = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.kick)).connect(kickLp);
+
+// CR78 snare — bandpass at 3 kHz for snap without harsh transients
+const snareFlt = new Tone.Filter(3000, 'bandpass').connect(reverb);
+const snare    = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.snare)).connect(snareFlt);
+
+// CR78 hi-hat — quiet, goes straight into the room reverb
+const hat = new Tone.Player(new Tone.ToneAudioBuffer(window._drumBufs.hihat)).connect(reverb);
+hat.volume.value = -28;
 ```
 
 ## Composition Structure
